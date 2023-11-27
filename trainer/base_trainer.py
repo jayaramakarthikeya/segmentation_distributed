@@ -44,8 +44,6 @@ class Trainer:
         else:
             self.mnt_mode, self.mnt_metric = self.monitor.split()
             assert self.mnt_mode in ['min', 'max']
-            self.mnt_best = -math.inf if self.mnt_mode == 'max' else math.inf
-            self.early_stoping = cfg_trainer.get('early_stop', math.inf)
 
         # CHECKPOINTS & TENSOBOARD
         start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
@@ -57,6 +55,9 @@ class Trainer:
 
         writer_dir = os.path.join(cfg_trainer['log_dir'], self.config['name'], start_time)
         self.writer = tensorboard.SummaryWriter(writer_dir)
+
+        #Early Stopping
+        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode,trace_func=self.logger)
 
     def _get_available_devices(self, n_gpu):
         sys_gpu = torch.cuda.device_count()
@@ -79,9 +80,18 @@ class Trainer:
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
 
+            self.logger.info(f"Results for {epoch} epoch: ")
+            for k , v in results.items():
+                self.logger.info(f" {str(k)}: {v}")
+            
 
-        
-    
+            self.early_stoping(results[self.mnt_metric],epoch,self.model)
+
+            if self.early_stoping.early_stop:
+                self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
+                self.logger.warning('Training Stopped')
+                break
+
 
         
 
