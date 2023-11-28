@@ -38,7 +38,7 @@ class SingleGPUTrainer(BaseTrainer):
         self._reset_metrics()
         tbar = tqdm(self.train_loader, ncols=130)
 
-        for batch_idx , (images,labels) in enumerate(self.train_loader):
+        for batch_idx , (images,labels) in enumerate(tbar):
             self.data_time.update(time.time() - tic)
             self.lr_sheduler.step(epoch=epoch-1)
 
@@ -96,6 +96,65 @@ class SingleGPUTrainer(BaseTrainer):
                 **seg_metrics}
 
         #if self.lr_scheduler is not None: self.lr_scheduler.step()
+        return log
+    
+    def _valid_epoch(self, epoch):
+        self.logger.info('\n###### EVALUATION ######')
+
+        self.model.eval()
+        self.writer_mode = 'val'
+
+        self._reset_metrics()
+        tbar = tqdm(self.val_loader, ncols=130)
+        with torch.no_grad():
+            val_visual = []
+            for batch_idx, (images,labels) in enumerate(tbar):
+                #data, target = data.to(self.device), target.to(self.device)
+                # LOSS
+                output = self.model(images)
+                loss = self.loss(output, labels)
+                self.total_loss.update(loss.item())
+
+                seg_metrics = eval_metrics(output, labels, self.num_classes)
+                self._update_seg_metrics(*seg_metrics)
+
+                # LIST OF IMAGE TO VIZ (15 images)
+                if len(val_visual) < 15:
+                    target_np = labels.data.cpu().numpy()
+                    output_np = output.data.max(1)[1].cpu().numpy()
+                    val_visual.append([images[0].data.cpu(), target_np[0], output_np[0]])
+
+                # PRINT INFO
+                pixAcc, mIoU, _ = self._get_seg_metrics().values()
+                tbar.set_description('EVAL ({}) | Loss: {:.3f}, PixelAcc: {:.2f}, Mean IoU: {:.2f} |'.format( epoch,
+                                                self.total_loss.average,
+                                                pixAcc, mIoU))
+
+            # WRTING & VISUALIZING THE MASKS
+            val_img = []
+            palette = self.train_loader.dataset.palette
+            for d, t, o in val_visual:
+                d = self.restore_transform(d)
+                t, o = colorize_mask(t, palette), colorize_mask(o, palette)
+                d, t, o = d.convert('RGB'), t.convert('RGB'), o.convert('RGB')
+                [d, t, o] = [self.viz_transform(x) for x in [d, t, o]]
+                val_img.extend([d, t, o])
+            val_img = torch.stack(val_img, 0)
+            val_img = make_grid(val_img.cpu(), nrow=3, padding=5)
+            self.writer.add_image(f'{self.wrt_mode}/inputs_targets_predictions', val_img, self.wrt_step)
+
+            # METRICS TO TENSORBOARD
+            self.wrt_step = (epoch) * len(self.val_loader)
+            self.writer.add_scalar(f'{self.wrt_mode}/loss', self.total_loss.average, self.wrt_step)
+            seg_metrics = self._get_seg_metrics()
+            for k, v in list(seg_metrics.items())[:-1]: 
+                self.writer.add_scalar(f'{self.wrt_mode}/{k}', v, self.wrt_step)
+
+            log = {
+                'val_loss': self.total_loss.average,
+                **seg_metrics
+            }
+
         return log
         
 

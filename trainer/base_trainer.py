@@ -75,7 +75,7 @@ class BaseTrainer:
     
 
     def train(self):
-        
+
         self.model.summary()
         for epoch in range(self.epochs):
             results = self._train_epoch(epoch)
@@ -105,9 +105,3 @@ class BaseTrainer:
 
     def _eval_metrics(self, output, target):
         raise NotImplementedError
-
-    def train(self, max_epochs: int):
-        for epoch in range(max_epochs):
-            self._run_epoch(epoch)
-            if epoch % self.save_every == 0:
-                self._save_checkpoint(epoch)

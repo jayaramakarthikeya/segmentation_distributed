@@ -11,6 +11,7 @@ import os , glob
 import pickle as pkl
 import utils
 import matplotlib.pyplot as plt
+from utils import pallete
 
 
 class ADE20KDataset(Dataset):
@@ -22,6 +23,7 @@ class ADE20KDataset(Dataset):
         self.DATASET_PATH = '../ADE20K_2021_17_01/'
         index_file = 'index_ade20k.pkl'
         self.num_classes = 150
+        self.pallete = pallete.ADE20K_palette
         with open('{}/{}'.format(self.DATASET_PATH, index_file), 'rb') as f:
             self.index_ade20k = pkl.load(f)
         self.root = root
