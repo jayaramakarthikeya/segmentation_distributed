@@ -199,3 +199,8 @@ class PSPDenseNet(BaseModel):
     def freeze_bn(self):
         for module in self.modules():
             if isinstance(module, nn.BatchNorm2d): module.eval()
+
+
+if __name__ == "__main__":
+    model = PSPNet(num_classes=150)
+    model.summary()
