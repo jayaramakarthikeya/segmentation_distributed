@@ -42,6 +42,7 @@ class PSPNet(BaseModel):
     def __init__(self, num_classes, in_channels=3, backbone='resnet152', pretrained=True, use_aux=True, freeze_bn=False, freeze_backbone=False):
         super(PSPNet, self).__init__()
         norm_layer = nn.BatchNorm2d
+        self.model_type = "PSPNet"
         model = getattr(resnet, backbone)(pretrained, norm_layer=norm_layer)
         m_out_sz = model.fc.in_features
         self.use_aux = use_aux 
@@ -112,6 +113,7 @@ class PSPDenseNet(BaseModel):
     def __init__(self, num_classes, in_channels=3, backbone='densenet201', pretrained=True, use_aux=True, freeze_bn=False, **_):
         super(PSPDenseNet, self).__init__()
         self.use_aux = use_aux 
+        self.model_type = "PSPDenseNet"
         model = getattr(models, backbone)(pretrained)
         m_out_sz = model.classifier.in_features
         aux_out_sz = model.features.transition3.conv.out_channels

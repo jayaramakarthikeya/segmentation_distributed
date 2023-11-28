@@ -1,8 +1,5 @@
 
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torchvision import transforms
 import datetime
 import os
 from utils import helpers
@@ -11,10 +8,11 @@ import json
 import math
 from base_trainer import EarlyStopping
 import logging
+from utils import losses
 
 
-class Trainer:
-    def __init__(self,config,model,train_loader,val_loader,optimizer,lr_sheduler,loss):
+class BaseTrainer:
+    def __init__(self,config,model,train_loader,val_loader):
         
         self.train_loader = train_loader
         self.config = config
@@ -22,21 +20,23 @@ class Trainer:
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
-        self.model_type = config['architecture']['type']
+        self.model_type = self.model.model_type
         self.device = config['device_type']
-        self.loss = loss
+        lr_sheduler_config = config['optimizer']['lr_scheduler']
+        self.lr_sheduler = getattr(torch.optim.lr_scheduler, lr_sheduler_config['type'])(self.optimizer,**lr_sheduler_config['args'])
+        self.loss = getattr(losses, config['loss'])(ignore_index = config['ignore_index'])
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.writer_mode = 'train'
 
-         # CONFIGS
+        #CONFIGS
         cfg_trainer = self.config['trainer']
         self.epochs = cfg_trainer['epochs']
         self.save_period = cfg_trainer['save_period']
 
         torch.backends.cudnn.benchmark = True
 
-        # MONITORING
+        #MONITORING
         self.monitor = cfg_trainer.get('monitor', 'off')
         if self.monitor == 'off':
             self.mnt_mode = 'off'
@@ -45,7 +45,7 @@ class Trainer:
             self.mnt_mode, self.mnt_metric = self.monitor.split()
             assert self.mnt_mode in ['min', 'max']
 
-        # CHECKPOINTS & TENSOBOARD
+        #CHECKPOINTS & TENSOBOARD
         start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
         self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.config['name'], start_time)
         helpers.dir_exists(self.checkpoint_dir)
@@ -75,6 +75,8 @@ class Trainer:
     
 
     def train(self):
+        
+        self.model.summary()
         for epoch in range(self.epochs):
             results = self._train_epoch(epoch)
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
