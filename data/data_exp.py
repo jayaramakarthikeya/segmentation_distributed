@@ -5,7 +5,7 @@ import pickle as pkl
 import utils
 
 # Load index with global information about ADE20K
-DATASET_PATH = '../ADE20K_2021_17_01/'
+DATASET_PATH = 'dataset_archive/ADE20K_2021_17_01'
 index_file = 'index_ade20k.pkl'
 with open('{}/{}'.format(DATASET_PATH, index_file), 'rb') as f:
     index_ade20k = pkl.load(f)

@@ -20,7 +20,7 @@ class ADE20KDataset(Dataset):
                 crop_size=None, scale=True, flip=False, rotate=False, blur=False) -> None:
         super().__init__()
 
-        self.DATASET_PATH = '../ADE20K_2021_17_01/'
+        self.DATASET_PATH = 'dataset_archive/ADE20K_2021_17_01'
         index_file = 'index_ade20k.pkl'
         self.num_classes = 150
         self.pallete = pallete.ADE20K_palette

@@ -8,7 +8,7 @@ from utils import transforms as local_transforms
 from utils.helpers import colorize_mask
 from utils.metrics import eval_metrics, AverageMeter
 from tqdm import tqdm
-from base_trainer import BaseTrainer
+from trainer.base_trainer import BaseTrainer
 
 class SingleGPUTrainer(BaseTrainer):
     def __init__(self, config, model, train_loader, val_loader):
@@ -16,7 +16,7 @@ class SingleGPUTrainer(BaseTrainer):
         self.device = self.config['device']
         self.model = model.to(self.device)
 
-        self.num_classes = self.train_loader.dataset.num_classes
+        self.num_classes = train_loader.dataset.num_classes
 
         super(SingleGPUTrainer,self).__init__(config, model, train_loader, val_loader)
 

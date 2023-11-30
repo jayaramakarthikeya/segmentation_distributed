@@ -6,7 +6,7 @@ from utils import helpers
 from torch.utils import tensorboard
 import json
 import math
-from base_trainer import EarlyStopping
+from .early_stopping import EarlyStopping
 import logging
 from utils import losses
 
