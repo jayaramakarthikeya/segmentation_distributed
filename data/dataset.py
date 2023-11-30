@@ -10,7 +10,6 @@ from torchvision import transforms
 from scipy import ndimage
 import os , glob
 import pickle as pkl
-import utils_
 import matplotlib.pyplot as plt
 from utils import pallete
 
@@ -140,7 +139,6 @@ class ADE20KDataset(Dataset):
     
     def _load_data(self, index):
         image_path = self.files[index]
-        print(image_path)
         label_path = image_path.replace('.jpg', '_seg.png')
         image = cv2.imread(image_path)[:,:,::-1]
         label = cv2.imread(label_path)[:,:,::-1]

@@ -1,4 +1,5 @@
 
+
 import torch
 import time
 import numpy as np
@@ -8,7 +9,7 @@ from utils import transforms as local_transforms
 from utils.helpers import colorize_mask
 from utils.metrics import eval_metrics, AverageMeter
 from tqdm import tqdm
-from base_trainer import BaseTrainer
+from trainer.base_trainer import BaseTrainer
 
 class SingleGPUTrainer(BaseTrainer):
     def __init__(self, config, model, train_loader, val_loader):
@@ -40,7 +41,8 @@ class SingleGPUTrainer(BaseTrainer):
 
         for batch_idx , (images,labels) in enumerate(tbar):
             self.data_time.update(time.time() - tic)
-            self.lr_sheduler.step(epoch=epoch-1)
+            if self.lr_sheduler is not None:
+                self.lr_sheduler.step(epoch=epoch-1)
 
             #FORWARD PASS
             self.optimizer.zero_grad()

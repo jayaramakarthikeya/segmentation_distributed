@@ -6,6 +6,7 @@ https://github.com/bermanmaxim/LovaszSoftmax/blob/master/pytorch/lovasz_losses.p
 
 from __future__ import print_function, division
 
+
 import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
@@ -183,7 +184,7 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
     class_to_sum = list(range(C)) if classes in ['all', 'present'] else classes
     for c in class_to_sum:
         fg = (labels == c).float() # foreground for class c
-        if (classes is 'present' and fg.sum() == 0):
+        if (classes == 'present' and fg.sum() == 0):
             continue
         if C == 1:
             if len(classes) > 1:
