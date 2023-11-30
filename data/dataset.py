@@ -1,4 +1,5 @@
-
+import sys
+sys.path.append('../')
 import random
 import numpy as np
 import cv2
@@ -9,7 +10,7 @@ from torchvision import transforms
 from scipy import ndimage
 import os , glob
 import pickle as pkl
-import utils
+import utils_
 import matplotlib.pyplot as plt
 from utils import pallete
 
@@ -48,7 +49,7 @@ class ADE20KDataset(Dataset):
     def _set_files(self):
         if self.split == "validation":
             self.image_label_dir = os.path.join(self.DATASET_PATH, 'images/ADE', self.split)
-            self.files = [path for path in glob(self.image_label_dir + '/**/*.jpg',recursive=True)]
+            self.files = [path for path in glob.glob(self.image_label_dir + '/**/*.jpg',recursive=True)]
         elif self.split == "training":
             self.files = [os.path.join(self.root,self.index_ade20k['folder'][i],self.index_ade20k['filename'][i]) 
                           for i in range(len(self.index_ade20k['filename']))]
@@ -139,6 +140,7 @@ class ADE20KDataset(Dataset):
     
     def _load_data(self, index):
         image_path = self.files[index]
+        print(image_path)
         label_path = image_path.replace('.jpg', '_seg.png')
         image = cv2.imread(image_path)[:,:,::-1]
         label = cv2.imread(label_path)[:,:,::-1]
