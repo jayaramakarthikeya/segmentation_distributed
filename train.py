@@ -21,7 +21,6 @@ from model.pspnet import PSPNet
 #params
 data_dir = '..'
 batch_size = 2
-split = 'training'
 crop_size = 100
 base_size = 200
 scale = True
@@ -31,18 +30,20 @@ num_epochs = 10
 
 def main(config):
 
-    dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split=split,\
-                                  crop_size=crop_size,base_size=base_size,scale=scale,\
-                                    augment=augment, val_split=0.8)
+    train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
+                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
+    
+    val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
+                                      crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    model = PSPNet(num_classes=dataloader.dataset.num_classes) 
+    model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
 
-    trainer = SingleGPUTrainer(config=config, model=model, train_loader=dataloader,
-                               val_loader=dataloader)
+    gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
+                               val_loader=val_dataloader)
     
 
-   # for epoch in num_epochs:
-    log = trainer._train_epoch(epoch=1)
+    gpu_trainer.train()
+   
     
 
 

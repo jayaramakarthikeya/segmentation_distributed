@@ -31,10 +31,10 @@
     },
 
     "trainer": {
-        "epochs": 80,
+        "epochs": 10,
         "save_dir": "saved/",
         "save_period": 10,
-        "tensorboard_log_step": 5,
+        "tensorboard_log_step": 1,
   
         "monitor": "max Mean_IoU",
         "early_stop": 10,
