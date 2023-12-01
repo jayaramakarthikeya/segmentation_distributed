@@ -11,14 +11,7 @@ from torch.utils.cpp_extension import CUDA_HOME, CppExtension, CUDAExtension
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 
-try:
-    if not os.getenv('RELEASE'):
-        from datetime import date
-        today = date.today()
-        day = today.strftime("b%Y%m%d")
-        version += day
-except Exception:
-    pass
+
 
 
 def get_extensions():
@@ -30,7 +23,7 @@ def get_extensions():
         glob.glob(os.path.join(gpu_extensions_dir, "*.cu"))
 
     print('cuda: ', source_cuda)
-
+    extra_compile_args = {"cxx": []}
 
     if CUDA_HOME is not None:
         define_macros = [("WITH_CUDA", None)]
