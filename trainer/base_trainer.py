@@ -147,7 +147,7 @@ class BaseTrainer:
                 loss += self.loss(output[1], labels) * 0.4
                 output = output[0]
             else:
-                assert output.size()[2:] == labels.size()[2:]
+                assert output.size()[2:] == labels.size()[1:]
                 assert output.size()[1] == self.num_classes 
                 loss = self.loss(output, labels)
 
