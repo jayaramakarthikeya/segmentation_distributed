@@ -229,14 +229,14 @@ class BaseTrainer:
                 val_img.extend([d, t, o])
             val_img = torch.stack(val_img, 0)
             val_img = make_grid(val_img.cpu(), nrow=3, padding=5)
-            self.writer.add_image(f'{self.wrt_mode}/inputs_targets_predictions', val_img, self.wrt_step)
+            self.writer.add_image(f'{self.writer_mode}/inputs_targets_predictions', val_img, self.wrt_step)
 
             # METRICS TO TENSORBOARD
             self.wrt_step = (epoch) * len(self.val_loader)
-            self.writer.add_scalar(f'{self.wrt_mode}/loss', self.total_loss.average, self.wrt_step)
+            self.writer.add_scalar(f'{self.writer_mode}/loss', self.total_loss.average, self.wrt_step)
             seg_metrics = self._get_seg_metrics()
             for k, v in list(seg_metrics.items())[:-1]: 
-                self.writer.add_scalar(f'{self.wrt_mode}/{k}', v, self.wrt_step)
+                self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
 
             log = {
                 'val_loss': self.total_loss.average,
