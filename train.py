@@ -1,4 +1,3 @@
-
 import sys
 sys.path.append('../')
 import torch
@@ -18,6 +17,7 @@ from trainer.single_gpu_train import SingleGPUTrainer
 from data_utils.dataloader import ADE20KDataLoader
 from model.pspnet import PSPNet
 from model.unet import UNet
+from model.deeplabv3 import DeepLab
 
 #params
 data_dir = '..'
@@ -40,6 +40,8 @@ def main(config):
     #model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
 
     model = UNet(num_classes=train_dataloader.dataset.num_classes)
+
+    #model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
 
     gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                                val_loader=val_dataloader)
