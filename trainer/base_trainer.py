@@ -19,11 +19,15 @@ from utils.metrics import eval_metrics, AverageMeter
 from torchvision.utils import make_grid
 from torchvision import transforms
 
+
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus):
         self.logger = logger
         self.train_loader = train_loader
         self.config = config
+        self.device = device
+        self.n_gpu = n_gpu
+        self.available_gpus = available_gpus
         self.model = model
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
@@ -125,6 +129,8 @@ class BaseTrainer:
         tbar = tqdm(self.train_loader, ncols=130)
 
         for batch_idx , (images,labels) in enumerate(tbar):
+            if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             if self.lr_sheduler is not None:
                 self.lr_sheduler.step(epoch=epoch-1)
@@ -196,7 +202,7 @@ class BaseTrainer:
         with torch.no_grad():
             val_visual = []
             for batch_idx, (images,labels) in enumerate(tbar):
-                #data, target = data.to(self.device), target.to(self.device)
+                
                 # LOSS
                 
                 output = self.model(images)
@@ -249,22 +255,22 @@ class BaseTrainer:
         self.batch_time = AverageMeter()
         self.data_time = AverageMeter()
         self.total_loss = AverageMeter()
-        self.total_inter, self.total_union = 0, 0
+        self.total_inter, self.total_union = AverageMeter(), AverageMeter()
         self.total_correct, self.total_label = 0, 0
 
     def _update_seg_metrics(self, correct, labeled, inter, union):
         self.total_correct += correct
         self.total_label += labeled
-        self.total_inter += inter
+        self.total_inter.update(inter)
         #print(inter,union)
-        self.total_union += union
+        self.total_union.update(union)
 
     def _get_seg_metrics(self):
         pixAcc = 1.0 * self.total_correct / (np.spacing(1) + self.total_label)
-        IoU = 1.0 * self.total_inter / (np.spacing(1) + self.total_union)
-        mIoU = IoU.mean()
+        IoU = self.total_inter.sum / (self.total_union.sum + 1e-10)
+        mIoU = np.mean(IoU)
         return {
             "Pixel_Accuracy": np.round(pixAcc, 3),
-            "Mean_IoU": np.round(mIoU, 3),
+            "Mean_IoU": mIoU,
             "Class_IoU": dict(zip(range(self.num_classes), np.round(IoU, 3)))
         }

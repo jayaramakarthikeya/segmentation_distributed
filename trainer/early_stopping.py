@@ -36,7 +36,7 @@ class EarlyStopping:
             self.counter = 0
 
     def save_checkpoint(self, score,epoch, model):
-        '''Saves model when validation loss decrease.'''
+        '''Saves model when validation metric decrease.'''
         if self.verbose:
             self.trace_func(f'Metric improved ({self.best_score:.6f} --> {score:.6f}).  Saving model ...')
         state = {
