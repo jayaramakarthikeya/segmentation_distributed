@@ -56,3 +56,7 @@ at::Tensor Expectation_Inp_Backward_CUDA(
   const at::Tensor gamma_,
   const at::Tensor beta_,
   float eps);
+
+void LeakyRelu_Forward_CUDA(at::Tensor z, float slope);
+
+void LeakyRelu_Backward_CUDA(at::Tensor z, at::Tensor dz, float slope);

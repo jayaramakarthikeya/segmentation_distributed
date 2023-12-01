@@ -9,4 +9,6 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
   m.def("expectation_backward", &Expectation_Backward_CUDA, "Expectation backward (CUDA)");
   m.def("expectation_inp_backward", &Expectation_Inp_Backward_CUDA,
         "Inplace Expectation backward (CUDA)");
+  m.def("leaky_relu_forward", &LeakyRelu_Forward_CUDA, "Learky ReLU forward (CUDA)");
+  m.def("leaky_relu_backward", &LeakyRelu_Backward_CUDA, "Learky ReLU backward (CUDA)");
 }
