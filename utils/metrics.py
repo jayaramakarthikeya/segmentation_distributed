@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+import matplotlib.pyplot as plt
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""
@@ -64,4 +65,5 @@ def eval_metrics(output, target, num_class):
     labeled = (target > 0) * (target <= num_class)
     correct, num_labeled = batch_pix_accuracy(predict, target, labeled)
     inter, union = batch_intersection_union(predict, target, num_class, labeled)
+    #print(inter,union)
     return [np.round(correct, 5), np.round(num_labeled, 5), np.round(inter, 5), np.round(union, 5)]

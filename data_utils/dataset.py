@@ -1,3 +1,4 @@
+
 import sys
 sys.path.append('../')
 import random
@@ -19,8 +20,7 @@ class ADE20KDataset(Dataset):
     def __init__(self,root, split, mean, std, base_size=None, augment=True, val=False,
                 crop_size=None, scale=True, flip=False, rotate=False, blur=False) -> None:
         super().__init__()
-
-        self.DATASET_PATH = '../ADE20K_2021_17_01/'
+        self.DATASET_PATH = 'ADE20K_2021_17_01'
         index_file = 'index_ade20k.pkl'
         self.num_classes = 150
         self.pallete = pallete.ADE20K_palette
@@ -50,7 +50,7 @@ class ADE20KDataset(Dataset):
             self.image_label_dir = os.path.join(self.DATASET_PATH, 'images/ADE', self.split)
             self.files = [path for path in glob.glob(self.image_label_dir + '/**/*.jpg',recursive=True)]
         elif self.split == "training":
-            self.files = [os.path.join(self.root,self.index_ade20k['folder'][i],self.index_ade20k['filename'][i]) 
+            self.files = [os.path.join(self.index_ade20k['folder'][i],self.index_ade20k['filename'][i]) 
                           for i in range(len(self.index_ade20k['filename']))]
         else: raise ValueError(f"Invalid split name {self.split}")
 
@@ -141,21 +141,34 @@ class ADE20KDataset(Dataset):
         image_path = self.files[index]
         label_path = image_path.replace('.jpg', '_seg.png')
         image = cv2.imread(image_path)[:,:,::-1]
-        label = cv2.imread(label_path)[:,:,::-1]
+        label = np.asarray(Image.open(label_path), dtype=np.int32) - 1
         return image, label
+    
+    def one_hot_encode(self,labels, palette):
+        semantic_map = []
+        for i in range(0,len(palette),3):
+            equal_maps = []
+            for j in range(0,3):
+                eq = np.equal(labels[:,:,j],palette[i])
+                equal_maps.append(eq)
+            equal_maps = np.stack(equal_maps,axis=-1)
+            class_map = equal_maps.all(axis=-1)
+            semantic_map.append(class_map)
+        semantic_map = np.stack(semantic_map,axis=-1)
+
+        return semantic_map
         
     def __len__(self):
         return len(self.files)
     
     def __getitem__(self, index):
         image, label = self._load_data(index)
+        
         if self.val:
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
-
-        label = torch.from_numpy(np.array(label, dtype=np.int32)).long()
-        label = label.permute(2,0,1)
+        label = torch.from_numpy(np.argmax(label,axis=-1)).long()
         image = Image.fromarray(image)
         return self.normalize(self.to_tensor(image)), label
 
@@ -180,10 +193,7 @@ if __name__ == "__main__":
             break
         print(data[0].shape,data[1].shape)
         f = plt.figure(figsize=(24,10))
-        plt.subplot(1,2,1)
         plt.imshow(data[0].permute(1,2,0).numpy())
-        plt.subplot(1,2,2)
-        plt.imshow(data[1].permute(1,2,0).numpy())
         plt.axis('off')  # Hide axes
         plt.show()
         i += 1

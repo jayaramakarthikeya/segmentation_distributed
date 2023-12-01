@@ -10,7 +10,6 @@ import math
 from trainer.early_stopping import EarlyStopping
 import logging
 from utils import losses
-logging.basicConfig(level=logging.NOTSET)
 
 class BaseTrainer:
     def __init__(self,config,model,train_loader,val_loader):
@@ -22,11 +21,13 @@ class BaseTrainer:
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
         self.model_type = self.model.model_type
-        self.device = config['device_type']
-        lr_sheduler_config = config['optimizer']['lr_scheduler'] if config['optimizer']['lr_scheduler'] is not None else None
+        lr_sheduler_config = None
         if lr_sheduler_config is not None:
             self.lr_sheduler = getattr(torch.optim.lr_scheduler, lr_sheduler_config['type'])(self.optimizer,**lr_sheduler_config['args'])
-        self.loss = getattr(losses, config['loss'])(ignore_index = config['ignore_index'])
+        else:
+            self.lr_sheduler = None
+        
+        self.loss = getattr(losses, config['loss'])()
         self.logger = logging.getLogger(self.__class__.__name__)
 
         self.writer_mode = 'train'

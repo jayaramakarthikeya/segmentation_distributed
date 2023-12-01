@@ -3,6 +3,7 @@ import sys
 sys.path.append('../')
 import torch
 import time
+import os
 import numpy as np
 import json
 import argparse
@@ -14,15 +15,15 @@ from utils.metrics import eval_metrics, AverageMeter
 from tqdm import tqdm
 from trainer.base_trainer import BaseTrainer
 from trainer.single_gpu_train import SingleGPUTrainer
-from data.dataloader import ADE20KDataLoader
-from model.base_model import BaseModel
+from data_utils.dataloader import ADE20KDataLoader
+from model.pspnet import PSPNet
 
 #params
-data_dir = '../data'
-batch_size = 32
+data_dir = '..'
+batch_size = 2
 split = 'training'
-crop_size = 321
-base_size = 550
+crop_size = 100
+base_size = 200
 scale = True
 augment = True
 
@@ -33,13 +34,11 @@ def main(config):
     dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split=split,\
                                   crop_size=crop_size,base_size=base_size,scale=scale,\
                                     augment=augment, val_split=0.8)
-    
-    train_loader, val_loader = dataloader.train_sampler, dataloader.val_sampler
 
-    model = BaseModel() 
+    model = PSPNet(num_classes=dataloader.dataset.num_classes) 
 
-    trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_loader, \
-                               val_loader=val_loader)
+    trainer = SingleGPUTrainer(config=config, model=model, train_loader=dataloader,
+                               val_loader=dataloader)
     
 
    # for epoch in num_epochs:

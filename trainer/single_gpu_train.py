@@ -14,8 +14,9 @@ from trainer.base_trainer import BaseTrainer
 class SingleGPUTrainer(BaseTrainer):
     def __init__(self, config, model, train_loader, val_loader):
         self.config = config
-        self.device = self.config['device']
-        self.model = model.to(self.device)
+        self.device = self.config['device_type']
+        self.model = model
+        self.train_loader = train_loader
 
         self.num_classes = self.train_loader.dataset.num_classes
 
@@ -56,7 +57,7 @@ class SingleGPUTrainer(BaseTrainer):
                 loss += self.loss(output[1], labels) * 0.4
                 output = output[0]
             else:
-                assert output.size()[2:] == labels.size()[1:]
+                assert output.size()[2:] == labels.size()[2:]
                 assert output.size()[1] == self.num_classes 
                 loss = self.loss(output, labels)
 
@@ -113,6 +114,7 @@ class SingleGPUTrainer(BaseTrainer):
             for batch_idx, (images,labels) in enumerate(tbar):
                 #data, target = data.to(self.device), target.to(self.device)
                 # LOSS
+                
                 output = self.model(images)
                 loss = self.loss(output, labels)
                 self.total_loss.update(loss.item())
@@ -171,12 +173,14 @@ class SingleGPUTrainer(BaseTrainer):
         self.total_correct += correct
         self.total_label += labeled
         self.total_inter += inter
+        #print(inter,union)
         self.total_union += union
 
     def _get_seg_metrics(self):
         pixAcc = 1.0 * self.total_correct / (np.spacing(1) + self.total_label)
         IoU = 1.0 * self.total_inter / (np.spacing(1) + self.total_union)
         mIoU = IoU.mean()
+        print(mIoU)
         return {
             "Pixel_Accuracy": np.round(pixAcc, 3),
             "Mean_IoU": np.round(mIoU, 3),

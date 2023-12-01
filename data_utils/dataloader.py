@@ -5,7 +5,7 @@ from copy import deepcopy
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
-from dataset import ADE20KDataset
+from data_utils.dataset import ADE20KDataset
 
 class ADE20KDataLoader(DataLoader):
     def __init__(self, data_dir, batch_size, split, crop_size=None, base_size=None, scale=True, num_workers=1, val=False,

@@ -5,7 +5,6 @@ import logging
 import torch.nn as nn
 import numpy as np
 from utils.torchsummary import summary
-logging.basicConfig(level=logging.NOTSET)
 
 class BaseModel(nn.Module):
     def __init__(self):
