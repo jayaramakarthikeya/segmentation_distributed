@@ -7,6 +7,10 @@ from torchvision import models
 import torch.utils.model_zoo as model_zoo
 from utils.helpers import initialize_weights
 from itertools import chain
+import io
+import ssl
+import urllib.request
+import os
 
 ''' 
 -> ResNet BackBone
@@ -20,7 +24,7 @@ class ResNet(nn.Module):
             self.layer0 = nn.Sequential(
                 nn.Conv2d(in_channels, 64, 7, stride=2, padding=3, bias=False),
                 nn.BatchNorm2d(64),
-                nn.ReLU(inplace=True),
+                nn.ReLU(inplace=False),
                 nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
             )
             initialize_weights(self.layer0)
@@ -96,7 +100,7 @@ class Block(nn.Module):
         else: self.skip = None
         
         rep = []
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
 
         rep.append(self.relu)
         rep.append(SeparableConv2d(in_channels, out_channels, 3, stride=1, dilation=dilation))
@@ -142,7 +146,7 @@ class Xception(nn.Module):
         # Entry Flow
         self.conv1 = nn.Conv2d(in_channels, 32, 3, 2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(32)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.conv2 = nn.Conv2d(32, 64, 3, 1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(64)
 
@@ -169,8 +173,15 @@ class Xception(nn.Module):
 
 
     def _load_pretrained_model(self):
-        url = 'http://data.lip6.fr/cadene/pretrainedmodels/xception-b5690688.pth'
-        pretrained_weights = model_zoo.load_url(url)
+
+        path_to_pretrained_weights = 'model/xception-b5690688.pth'  # Change this to your file path
+
+        assert os.path.isfile(path_to_pretrained_weights), \
+            f"File not found: {path_to_pretrained_weights}. Please download the file from http://data.lip6.fr/cadene/pretrainedmodels/xception-b5690688.pth"
+
+        # Load the model weights
+        pretrained_weights = torch.load(path_to_pretrained_weights, map_location='cpu')
+
         state_dict = self.state_dict()
         model_dict = {}
 
@@ -255,7 +266,7 @@ def assp_branch(in_channels, out_channles, kernel_size, dilation):
     return nn.Sequential(
             nn.Conv2d(in_channels, out_channles, kernel_size, padding=padding, dilation=dilation, bias=False),
             nn.BatchNorm2d(out_channles),
-            nn.ReLU(inplace=True))
+            nn.ReLU(inplace=False))
 
 class ASSP(nn.Module):
     def __init__(self, in_channels, output_stride):
@@ -274,11 +285,11 @@ class ASSP(nn.Module):
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Conv2d(in_channels, 256, 1, bias=False),
             nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True))
+            nn.ReLU(inplace=False))
         
         self.conv1 = nn.Conv2d(256*5, 256, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(256)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
         self.dropout = nn.Dropout(0.5)
 
         initialize_weights(self)
@@ -305,16 +316,16 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
         self.conv1 = nn.Conv2d(low_level_channels, 48, 1, bias=False)
         self.bn1 = nn.BatchNorm2d(48)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = nn.ReLU(inplace=False)
 
         # Table 2, best performance with two 3x3 convs
         self.output = nn.Sequential(
             nn.Conv2d(48+256, 256, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Conv2d(256, 256, 3, stride=1, padding=1, bias=False),
             nn.BatchNorm2d(256),
-            nn.ReLU(inplace=True),
+            nn.ReLU(inplace=False),
             nn.Dropout(0.1),
             nn.Conv2d(256, num_classes, 1, stride=1),
         )
@@ -336,6 +347,8 @@ class Decoder(nn.Module):
 class DeepLab(BaseModel):
     def __init__(self, num_classes, in_channels=3, backbone='xception', pretrained=True, 
                 output_stride=16, freeze_bn=False, freeze_backbone=False, **_):
+        
+        self.model_type = "DeepLab"
                 
         super(DeepLab, self).__init__()
         assert ('xception' or 'resnet' in backbone)

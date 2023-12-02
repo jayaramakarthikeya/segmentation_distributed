@@ -31,6 +31,8 @@ num_epochs = 10
 
 def main(config):
 
+    torch.autograd.set_detect_anomaly(True)
+
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
                                   crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
     
@@ -39,9 +41,9 @@ def main(config):
 
     #model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
 
-    model = UNet(num_classes=train_dataloader.dataset.num_classes)
+    #model = UNet(num_classes=train_dataloader.dataset.num_classes)
 
-    #model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
+    model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
 
     gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                                val_loader=val_dataloader)
