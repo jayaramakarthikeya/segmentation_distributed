@@ -51,8 +51,7 @@ if __name__ == '__main__':
 
     setup(
         name="torch-syncbn",
-        package_data={ 'encoding': [
-            'LICENSE',
+        package_data={ 'torch-segmentation': [
             'lib/*.h',
             'lib/*.cpp',
             'lib/*.h',
