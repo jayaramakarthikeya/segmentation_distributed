@@ -14,7 +14,7 @@ class SingleGPUTrainer(BaseTrainer):
             model_ = model.to(self.device)
         elif self.device == 'cpu':
             model_ = model
-        self.model = model
+        self.model = model_
         self.train_loader = train_loader
 
         self.num_classes = self.train_loader.dataset.num_classes
