@@ -1,4 +1,3 @@
-
 import sys
 sys.path.append('../')
 import torch
@@ -17,6 +16,8 @@ from trainer.base_trainer import BaseTrainer
 from trainer.single_gpu_train import SingleGPUTrainer
 from data_utils.dataloader import ADE20KDataLoader
 from model.pspnet import PSPNet
+from model.unet import UNet
+from model.deeplabv3 import DeepLab
 
 #params
 data_dir = '..'
@@ -30,13 +31,19 @@ num_epochs = 10
 
 def main(config):
 
+    torch.autograd.set_detect_anomaly(True)
+
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
                                   crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
+    #model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
+
+    #model = UNet(num_classes=train_dataloader.dataset.num_classes)
+
+    model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
 
     gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                                val_loader=val_dataloader)

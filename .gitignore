@@ -2,3 +2,4 @@ ADE20K_2021_17_01/
 pretrained/
 __pycache__/
 saved/
+model/xception-b5690688.pth
