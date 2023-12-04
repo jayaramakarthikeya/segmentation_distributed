@@ -18,6 +18,18 @@ from data_utils.dataloader import ADE20KDataLoader
 from model.pspnet import PSPNet
 from model.unet import UNet
 from model.deeplabv3 import DeepLab
+from model.sam_model_train import sam_model_train
+
+import subprocess
+import sys
+
+def install_package(package):
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package, "-q"])
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to install {package}: {e}")
+
+
 
 #params
 data_dir = '..'
@@ -29,7 +41,7 @@ augment = True
 
 num_epochs = 10
 
-def main(config):
+def main(config, model):
 
     torch.autograd.set_detect_anomaly(True)
 
@@ -38,18 +50,36 @@ def main(config):
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
-
-    #model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
-
-    #model = UNet(num_classes=train_dataloader.dataset.num_classes)
-
-    model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
-
-    gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
-                               val_loader=val_dataloader)
     
+    if model == "PSPNet":
 
-    gpu_trainer.train()
+        model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
+
+    elif model == "UNet":
+        model = UNet(num_classes=train_dataloader.dataset.num_classes)
+
+    elif model == "DeepLab":
+        model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
+    
+    elif model == "Transformer":
+        print("Loading SAM Facebook VIT model...")
+        install_package("git+https://github.com/huggingface/transformers.git")
+        install_package("monai") #For custom loss
+
+        mean_iou, pixAcc = sam_model_train(train_dataloader, val_dataloader)
+
+        print("Mean IOU: {} and Pixel Acc = {}".format(mean_iou, pixAcc))
+    
+    else:
+        print("invalid model")
+
+
+    if model != "Transformer":
+        gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
+                                val_loader=val_dataloader)
+        
+
+        gpu_trainer.train()
    
     
 
@@ -60,6 +90,8 @@ if __name__ == '__main__':
                         help='Path to the config file (default: config.json)')
     parser.add_argument('-d', '--device', default=None, type=str,
                            help='indices of GPUs to enable (default: all)')
+    parser.add_argument('-m', '--model', default=None, type=str,
+                           help='Specifies which model')
     args = parser.parse_args()
 
     config = json.load(open(args.config))
@@ -67,4 +99,4 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
     
-    main(config)
+    main(config, args.model)
