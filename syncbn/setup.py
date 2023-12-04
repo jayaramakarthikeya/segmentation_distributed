@@ -27,7 +27,7 @@ def get_extensions():
 
     if CUDA_HOME is not None:
         define_macros = [("WITH_CUDA", None)]
-        include_dirs += [gpu_extensions_dir]
+        include_dirs = [gpu_extensions_dir]
         extra_compile_args["nvcc"] = [
             "-DCUDA_HAS_FP16=1",
             "-D__CUDA_NO_HALF_OPERATORS__",

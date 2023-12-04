@@ -21,13 +21,13 @@ from model.deeplabv3 import DeepLab
 
 #params
 data_dir = '..'
-batch_size = 2
-crop_size = 100
-base_size = 200
+batch_size = 4
+crop_size = 380
+base_size = 400
 scale = True
 augment = True
 
-num_epochs = 10
+num_epochs = 180
 
 def main(config):
 
@@ -39,7 +39,7 @@ def main(config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
+    model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet101') 
 
     #model = UNet(num_classes=train_dataloader.dataset.num_classes)
 

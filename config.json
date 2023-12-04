@@ -7,23 +7,22 @@
     "arch": {
         "type": "PSPNet",
         "args": {
-            "backbone": "resnet50",
+            "backbone": "resnet101",
             "freeze_bn": false,
             "freeze_backbone": false
         }
     },
 
     "optimizer": {
-        "type": "SGD",
+        "type": "Adam",
         "differential_lr": true,
         "args":{
             "lr": 0.01,
-            "weight_decay": 1e-4,
-            "momentum": 0.9
+            "weight_decay": 0.0001
         }
     },
 
-    "loss": "CrossEntropyLoss2d",
+    "loss": "FocalLoss",
     "ignore_index": 255,
     "lr_scheduler": {
         "type": "Poly",
@@ -31,7 +30,7 @@
     },
 
     "trainer": {
-        "epochs": 10,
+        "epochs": 180,
         "save_dir": "saved/",
         "save_period": 10,
         "tensorboard_log_step": 1,
