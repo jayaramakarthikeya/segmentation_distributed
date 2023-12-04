@@ -6,6 +6,10 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from data_utils.dataset import ADE20KDataset
+import matplotlib.pyplot as plt
+from utils import transforms as local_transforms
+from utils.helpers import colorize_mask
+from torchvision import transforms
 
 class ADE20KDataLoader(DataLoader):
     def __init__(self, data_dir, batch_size, split, crop_size=None, base_size=None, scale=True, num_workers=1, val=False,
@@ -70,15 +74,35 @@ class ADE20KDataLoader(DataLoader):
 
 if __name__ == "__main__":
     data_dir = '..'
-    batch_size = 32
+    batch_size = 2
     split = 'training'
-    crop_size = 321
-    base_size = 550
+    crop_size = 700
+    base_size = 1000
     scale = True
     augment = True
-    dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split=split,crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
+    dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split=split,crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4,
+                    shuffle=True, flip=True, rotate=True, blur= True)
+    i=0
+    
+    restore_transform = transforms.Compose([
+            local_transforms.DeNormalize(dataloader.MEAN, dataloader.STD),
+            transforms.ToPILImage()])
+    
 
-    for batch in dataloader:
-        print(batch[0].shape)
-        break
+    for images,labels in dataloader:
+        if i == 5:
+            break
+        print(images.shape,labels.shape)
+        f = plt.figure(figsize=(24,10))
+        plt.subplot(2,2,1)
+        plt.imshow(restore_transform(images[0]))
+        plt.subplot(2,2,2)
+        plt.imshow(restore_transform(images[1]))
+        plt.subplot(2,2,3)
+        plt.imshow(colorize_mask(labels[0].numpy(),dataloader.dataset.pallete).convert('RGB'))
+        plt.subplot(2,2,4)
+        plt.imshow(colorize_mask(labels[1].numpy(),dataloader.dataset.pallete).convert('RGB'))
+        plt.axis('off')  # Hide axes
+        plt.show()
+        i += 1
     

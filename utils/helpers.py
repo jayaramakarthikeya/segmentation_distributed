@@ -34,10 +34,8 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
     return torch.from_numpy(weight).float()
 
 def colorize_mask(mask, palette):
-    zero_pad = 256 * 3 - len(palette)
-    for i in range(zero_pad):
-                    palette.append(0)
-    new_mask = PIL.Image.fromarray(mask.astype(np.uint8)).convert('P')
+    mask = mask + 1
+    new_mask = PIL.Image.fromarray(mask.astype(np.uint8))
     new_mask.putpalette(palette)
     return new_mask
 

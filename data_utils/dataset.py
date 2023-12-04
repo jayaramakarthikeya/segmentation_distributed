@@ -13,6 +13,8 @@ import os , glob
 import pickle as pkl
 import matplotlib.pyplot as plt
 from utils import pallete
+from utils import transforms as local_transforms
+from utils.helpers import colorize_mask
 
 
 class ADE20KDataset(Dataset):
@@ -78,7 +80,7 @@ class ADE20KDataset(Dataset):
         return image, label
 
     def _augmentation(self, image, label):
-
+        np.random.seed(42)
         h, w, _ = image.shape
         # Scaling, we set the bigger to base size, and the smaller 
         # one is rescaled to maintain the same ratio, if we don't have any obj in the image, re-do the processing
@@ -94,11 +96,11 @@ class ADE20KDataset(Dataset):
         h, w, _ = image.shape
         # Rotate the image with an angle between -10 and 10
         if self.rotate:
-            angle = random.randint(-10, 10)
-            center = (w / 2, h / 2)
-            rot_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-            image = cv2.warpAffine(image, rot_matrix, (w, h), flags=cv2.INTER_LINEAR)#, borderMode=cv2.BORDER_REFLECT)
-            label = cv2.warpAffine(label, rot_matrix, (w, h), flags=cv2.INTER_NEAREST)#,  borderMode=cv2.BORDER_REFLECT)
+            if random.random() > 0.5:
+                angle = random.randint(-10, 10)
+                center = (w / 2, h / 2)
+                rot_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+                image = cv2.warpAffine(image, rot_matrix, (w, h), flags=cv2.INTER_LINEAR)#, borderMode=cv2.BORDER_REFLECT)
 
         # Padding to return the correct crop size
         if self.crop_size:
@@ -127,37 +129,37 @@ class ADE20KDataset(Dataset):
         if self.flip:
             if random.random() > 0.5:
                 image = np.fliplr(image).copy()
-                label = np.fliplr(label).copy()
 
         # Gaussian Blud (sigma between 0 and 1.5)
         if self.blur:
-            sigma = random.random()
-            ksize = int(3.3 * sigma)
-            ksize = ksize + 1 if ksize % 2 == 0 else ksize
-            image = cv2.GaussianBlur(image, (ksize, ksize), sigmaX=sigma, sigmaY=sigma, borderType=cv2.BORDER_REFLECT_101)
+            if random.random() > 0.5:
+                sigma = random.random()
+                ksize = int(3.3 * sigma)
+                ksize = ksize + 1 if ksize % 2 == 0 else ksize
+                image = cv2.GaussianBlur(image, (ksize, ksize), sigmaX=sigma, sigmaY=sigma, borderType=cv2.BORDER_REFLECT_101)
         return image, label
     
     def _load_data(self, index):
         image_path = self.files[index]
         label_path = image_path.replace('.jpg', '_seg.png')
         image = cv2.imread(image_path)[:,:,::-1]
-        label = np.asarray(Image.open(label_path), dtype=np.int32) - 1
+        label = np.array(Image.open(label_path),dtype=np.int32)
         return image, label
     
-    def one_hot_encode(self,labels, palette):
-        semantic_map = []
-        for i in range(0,len(palette),3):
-            equal_maps = []
-            for j in range(0,3):
-                eq = np.equal(labels[:,:,j],palette[i])
-                equal_maps.append(eq)
-            equal_maps = np.stack(equal_maps,axis=-1)
-            class_map = equal_maps.all(axis=-1)
-            semantic_map.append(class_map)
-        semantic_map = np.stack(semantic_map,axis=-1)
+    def one_hot_encode(self,target):
+        target = torch.from_numpy(target)
+        colors = torch.unique(target.reshape(-1, target.size(2)), dim=0).numpy()
+        target = target.permute(2, 0, 1).contiguous()
+        mapping = {tuple(c): t for c, t in zip(colors.tolist(), range(len(colors)))}
+        mask = torch.empty(target.shape[1], target.shape[2], dtype=torch.long)
+        for k in mapping:
+            # Get all indices for current class
+            idx = (target==torch.tensor(k, dtype=torch.uint8).unsqueeze(1).unsqueeze(2))
+            validx = (idx.sum(0) == 3)  # Check that all channels match
+            mask[validx] = torch.tensor(mapping[k], dtype=torch.long) if mapping[k] < 255 else 0
 
-        return semantic_map
-        
+        return mask
+    
     def __len__(self):
         return len(self.files)
     
@@ -168,7 +170,7 @@ class ADE20KDataset(Dataset):
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
-        label = torch.from_numpy(np.argmax(label,axis=-1)).long()
+        label = self.one_hot_encode(label)
         image = Image.fromarray(image)
         return self.normalize(self.to_tensor(image)), label
 
@@ -185,7 +187,10 @@ if __name__ == "__main__":
     MEAN = [0.48897059, 0.46548275, 0.4294]
     STD = [0.22861765, 0.22948039, 0.24054667]
     root = '..'
-    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=550,crop_size=321)
+    restore_transform = transforms.Compose([
+            local_transforms.DeNormalize(MEAN, STD),
+            transforms.ToPILImage()])
+    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=700,crop_size=500)
     print("Dataset Length: ",len(dataset))
     i = 0
     for data in dataset:
@@ -193,7 +198,10 @@ if __name__ == "__main__":
             break
         print(data[0].shape,data[1].shape)
         f = plt.figure(figsize=(24,10))
-        plt.imshow(data[0].permute(1,2,0).numpy())
+        plt.subplot(1,2,1)
+        plt.imshow(restore_transform(data[0]))
+        plt.subplot(1,2,2)
+        plt.imshow(colorize_mask(data[1].numpy(),dataset.pallete).convert('RGB'))
         plt.axis('off')  # Hide axes
         plt.show()
         i += 1

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 import pickle as pkl
-import utils
+import utils_ as utils
 
 # Load index with global information about ADE20K
 DATASET_PATH = '../ADE20K_2021_17_01/'
@@ -69,7 +69,7 @@ label = cv2.imread(files[1].replace('.jpg', '_seg.png'))[:,:,::-1]
 #label = image.astype(np.int32)
 
 plt.figure(figsize=(24,10))
-
+print(label.shape)
 plt.imshow(np.concatenate([image, label], 1))
 plt.axis('off')
 

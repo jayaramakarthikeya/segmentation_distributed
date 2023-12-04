@@ -39,11 +39,11 @@ def main(config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    #model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
+    model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
 
     #model = UNet(num_classes=train_dataloader.dataset.num_classes)
 
-    model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
+    #model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
 
     gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                                val_loader=val_dataloader)
