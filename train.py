@@ -22,8 +22,8 @@ from model.deeplabv3 import DeepLab
 #params
 data_dir = '..'
 batch_size = 4
-crop_size = 380
-base_size = 400
+crop_size = 321
+base_size = 550
 scale = True
 augment = True
 
@@ -39,17 +39,18 @@ def main(config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
+    
+    unet = UNet(num_classes=train_dataloader.dataset.num_classes)
+    deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
+    pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
+    models = [unet,pspnet,deepLab]
 
-    #model = UNet(num_classes=train_dataloader.dataset.num_classes)
+    for model in models:
 
-    #model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
-
-    gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
+        gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                                val_loader=val_dataloader)
     
-
-    gpu_trainer.train()
+        gpu_trainer.train()
    
     
 

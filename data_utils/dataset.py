@@ -174,7 +174,7 @@ class ADE20KDataset(Dataset):
             image, label = self._augmentation(image, label)
         label = self.one_hot_encode(label)
         image = Image.fromarray(image)
-        return self.normalize(self.to_tensor(image)), torch.from_numpy(label).long()
+        return self.normalize(self.to_tensor(image)), label
 
     def __repr__(self):
         fmt_str = "Dataset: " + self.__class__.__name__ + "\n"

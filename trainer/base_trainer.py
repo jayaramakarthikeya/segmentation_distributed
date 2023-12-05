@@ -33,11 +33,7 @@ class BaseTrainer:
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
         self.model_type = self.model.model_type
-        lr_sheduler_config = None
-        if lr_sheduler_config is not None:
-            self.lr_sheduler = getattr(torch.optim.lr_scheduler, lr_sheduler_config['type'])(self.optimizer,**lr_sheduler_config['args'])
-        else:
-            self.lr_sheduler = None
+        
         
         self.loss = getattr(losses, config['loss'])()
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
@@ -49,6 +45,8 @@ class BaseTrainer:
         cfg_trainer = self.config['trainer']
         self.epochs = cfg_trainer['epochs']
         self.save_period = cfg_trainer['save_period']
+        lr_lambda = lambda epoch : (1 - (epoch/self.epochs))**0.9
+        self.lr_sheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,lr_lambda=lr_lambda)
 
         torch.backends.cudnn.benchmark = True
 
@@ -80,7 +78,7 @@ class BaseTrainer:
             local_transforms.DeNormalize(self.train_loader.MEAN, self.train_loader.STD),
             transforms.ToPILImage()])
         self.viz_transform = transforms.Compose([
-            transforms.Resize((400, 400)),
+            transforms.Resize((321, 321)),
             transforms.ToTensor()])
         
         self.log_step = self.config['trainer']['tensorboard_log_step']
@@ -103,7 +101,7 @@ class BaseTrainer:
     def train(self):
 
         self.model.summary()
-        for epoch in range(self.epochs):
+        for epoch in range(1,self.epochs):
             results = self._train_epoch(epoch)
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
@@ -134,8 +132,6 @@ class BaseTrainer:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=False):
-                if self.lr_sheduler is not None:
-                    self.lr_sheduler.step(epoch=epoch-1)
 
                 #FORWARD PASS
                 self.optimizer.zero_grad()
@@ -158,6 +154,9 @@ class BaseTrainer:
                 self.scaler.step(self.optimizer)
                 self.scaler.update()
                 self.total_loss.update(loss.item())
+
+                if self.lr_sheduler is not None:
+                    self.lr_sheduler.step(loss.cpu().data.numpy())
 
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
