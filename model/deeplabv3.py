@@ -174,7 +174,7 @@ class Xception(nn.Module):
 
     def _load_pretrained_model(self):
 
-        path_to_pretrained_weights = 'model/xception-b5690688.pth'  # Change this to your file path
+        path_to_pretrained_weights = 'pretrained/xception-b5690688.pth'  # Change this to your file path
 
         assert os.path.isfile(path_to_pretrained_weights), \
             f"File not found: {path_to_pretrained_weights}. Please download the file from http://data.lip6.fr/cadene/pretrainedmodels/xception-b5690688.pth"
@@ -364,7 +364,7 @@ class DeepLab(BaseModel):
 
         if freeze_bn: self.freeze_bn()
         if freeze_backbone: 
-            set_trainable([self.backbone], False)
+            self.set_trainable([self.backbone], False)
 
     def forward(self, x):
         H, W = x.size(2), x.size(3)
