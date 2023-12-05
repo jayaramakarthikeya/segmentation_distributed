@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from utils import pallete
 from utils import transforms as local_transforms
 from utils.helpers import colorize_mask
+from utils.pallete import ADE20K_palette_onehot
 
 
 class ADE20KDataset(Dataset):
@@ -144,15 +145,16 @@ class ADE20KDataset(Dataset):
     def _load_data(self, index):
         image_path = self.files[index]
         label_path = image_path.replace('.jpg', '_seg.png')
-        image = cv2.imread(image_path)[:,:,::-1]
-        label = np.array(Image.open(label_path),dtype=np.int32)
+        image = np.array(Image.open(image_path).convert('RGB'))
+        label = np.array(Image.open(label_path).convert('L'),dtype=np.int32) -1
         return image, label
     
     def one_hot_encode(self,target):
         target = torch.from_numpy(target)
         colors = torch.unique(target.reshape(-1, target.size(2)), dim=0).numpy()
+        #print(colors,colors.shape)
         target = target.permute(2, 0, 1).contiguous()
-
+        print(target)
         mapping = {tuple(c): t for c, t in zip(colors.tolist(), range(len(colors)))}
         mask = torch.empty(target.shape[1], target.shape[2], dtype=torch.long)
         for k in mapping:
@@ -168,13 +170,16 @@ class ADE20KDataset(Dataset):
     
     def __getitem__(self, index):
         image, label = self._load_data(index)
+        #print(label,label.shape)
+        #plt.imshow(label)
+        #plt.show()
         if self.val:
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
-        label = self.one_hot_encode(label)
+        label = torch.from_numpy(label).long()
         image = Image.fromarray(image)
-        return self.normalize(self.to_tensor(image)), torch.from_numpy(label).long()
+        return self.normalize(self.to_tensor(image)), label
 
     def __repr__(self):
         fmt_str = "Dataset: " + self.__class__.__name__ + "\n"
@@ -192,7 +197,7 @@ if __name__ == "__main__":
     restore_transform = transforms.Compose([
             local_transforms.DeNormalize(MEAN, STD),
             transforms.ToPILImage()])
-    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=400,crop_size=380)
+    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=550,crop_size=321)
     print("Dataset Length: ",len(dataset))
     i = 0
     for data in dataset:
