@@ -18,6 +18,7 @@ from data_utils.dataloader import ADE20KDataLoader
 from model.pspnet import PSPNet
 from model.unet import UNet
 from model.deeplabv3 import DeepLab
+from model.upernet import UperNet
 
 #params
 data_dir = '..'
@@ -43,7 +44,8 @@ def main(config):
     unet = UNet(num_classes=train_dataloader.dataset.num_classes)
     deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
-    models = [unet,deepLab,pspnet]
+    upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
+    models = [unet,deepLab,pspnet,upernet]
 
     for model in models:
 
