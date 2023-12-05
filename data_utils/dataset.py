@@ -101,6 +101,7 @@ class ADE20KDataset(Dataset):
                 center = (w / 2, h / 2)
                 rot_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
                 image = cv2.warpAffine(image, rot_matrix, (w, h), flags=cv2.INTER_LINEAR)#, borderMode=cv2.BORDER_REFLECT)
+                label = cv2.warpAffine(label, rot_matrix, (w, h), flags=cv2.INTER_NEAREST)#,  borderMode=cv2.BORDER_REFLECT)
 
         # Padding to return the correct crop size
         if self.crop_size:
@@ -129,6 +130,7 @@ class ADE20KDataset(Dataset):
         if self.flip:
             if random.random() > 0.5:
                 image = np.fliplr(image).copy()
+                label = np.fliplr(label).copy()
 
         # Gaussian Blud (sigma between 0 and 1.5)
         if self.blur:
@@ -172,7 +174,7 @@ class ADE20KDataset(Dataset):
             image, label = self._augmentation(image, label)
         label = self.one_hot_encode(label)
         image = Image.fromarray(image)
-        return self.normalize(self.to_tensor(image)), label
+        return self.normalize(self.to_tensor(image)), torch.from_numpy(label).long()
 
     def __repr__(self):
         fmt_str = "Dataset: " + self.__class__.__name__ + "\n"

@@ -3,3 +3,6 @@ pretrained/
 __pycache__/
 saved/
 model/xception-b5690688.pth
+build/
+dist/
+torch_syncbn.egg-info/
