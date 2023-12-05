@@ -18,7 +18,7 @@ from data_utils.dataloader import ADE20KDataLoader
 from model.pspnet import PSPNet
 from model.unet import UNet
 from model.deeplabv3 import DeepLab
-from model.sam_model_train import sam_model_train
+from model.vit import vit_train
 
 import subprocess
 import sys
@@ -33,9 +33,9 @@ def install_package(package):
 
 #params
 data_dir = '..'
-batch_size = 2
-crop_size = 100
-base_size = 200
+batch_size = 16
+crop_size = 128
+base_size = 256
 scale = True
 augment = True
 
@@ -50,9 +50,9 @@ def main(config, model):
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
+
     
     if model == "PSPNet":
-
         model = PSPNet(num_classes=train_dataloader.dataset.num_classes) 
 
     elif model == "UNet":
@@ -62,13 +62,10 @@ def main(config, model):
         model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     
     elif model == "Transformer":
-        print("Loading SAM Facebook VIT model...")
-        install_package("git+https://github.com/huggingface/transformers.git")
-        install_package("monai") #For custom loss
 
-        mean_iou, pixAcc = sam_model_train(train_dataloader, val_dataloader)
+        vit_train(train_dataloader, val_dataloader)
 
-        print("Mean IOU: {} and Pixel Acc = {}".format(mean_iou, pixAcc))
+        #print("Mean IOU: {} and Pixel Acc = {}".format(mean_iou, pixAcc))
     
     else:
         print("invalid model")
