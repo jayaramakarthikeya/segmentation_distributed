@@ -26,7 +26,7 @@ class ADE20KDataset(Dataset):
         super().__init__()
         self.DATASET_PATH = 'ADEChallengeData2016'
         self.num_classes = 150
-        self.pallete = pallete.ADE20K_palette
+        self.palette = pallete.ADE20K_palette
         self.root = root
         self.split = split
         self.mean = mean
@@ -172,7 +172,7 @@ class ADE20KDataset(Dataset):
             image, label = self._augmentation(image, label)
         label = torch.from_numpy(np.array(label,dtype=np.int32)).long()
         image = Image.fromarray(np.uint8(image))
-        return self.normalize(self.to_tensor(image)), label
+        return self.normalize(self.to_tensor(image)).float(), label
 
     def __repr__(self):
         fmt_str = "Dataset: " + self.__class__.__name__ + "\n"

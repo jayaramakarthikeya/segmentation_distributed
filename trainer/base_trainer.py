@@ -40,12 +40,13 @@ class BaseTrainer:
         
 
         self.writer_mode = 'train'
+        self.wrt_step = 0
 
         #CONFIGS
         cfg_trainer = self.config['trainer']
         self.epochs = cfg_trainer['epochs']
         self.save_period = cfg_trainer['save_period']
-        lr_lambda = lambda epoch : (1 - (epoch/self.epochs))**0.9
+        lr_lambda = lambda epoch : pow((1 - (epoch/self.epochs)),0.9)
         self.lr_sheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,lr_lambda=lr_lambda)
 
         torch.backends.cudnn.benchmark = True
@@ -131,7 +132,7 @@ class BaseTrainer:
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
-            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=False):
+            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
                 #FORWARD PASS
                 self.optimizer.zero_grad()
@@ -155,8 +156,6 @@ class BaseTrainer:
                 self.scaler.update()
                 self.total_loss.update(loss.item())
 
-                if self.lr_sheduler is not None:
-                    self.lr_sheduler.step()
 
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
@@ -189,6 +188,9 @@ class BaseTrainer:
         # RETURN LOSS & METRICS
         log = {'loss': self.total_loss.average,
                 **seg_metrics}
+        
+        if self.lr_sheduler is not None:
+            self.lr_sheduler.step()
 
         #if self.lr_scheduler is not None: self.lr_scheduler.step()
         return log
@@ -204,7 +206,8 @@ class BaseTrainer:
         with torch.no_grad():
             val_visual = []
             for batch_idx, (images,labels) in enumerate(tbar):
-                
+                if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                    images , labels = images.to(self.device) , labels.to(self.device)
                 # LOSS
                 
                 output = self.model(images)
@@ -257,19 +260,18 @@ class BaseTrainer:
         self.batch_time = AverageMeter()
         self.data_time = AverageMeter()
         self.total_loss = AverageMeter()
-        self.total_inter, self.total_union = AverageMeter(), AverageMeter()
+        self.total_inter, self.total_union = 0 , 0
         self.total_correct, self.total_label = 0, 0
 
     def _update_seg_metrics(self, correct, labeled, inter, union):
         self.total_correct += correct
         self.total_label += labeled
-        self.total_inter.update(inter)
-        #print(inter,union)
-        self.total_union.update(union)
+        self.total_inter += inter
+        self.total_union += union
 
     def _get_seg_metrics(self):
-        pixAcc = 1.0 * self.total_correct / (np.spacing(1) + self.total_label)
-        IoU = self.total_inter.sum / (self.total_union.sum + 1e-10)
+        pixAcc = 100.0 * self.total_correct / (np.spacing(1) + self.total_label)
+        IoU = 100.0 * self.total_inter / (np.spacing(1) + self.total_union)
         mIoU = np.mean(IoU)
         return {
             "Pixel_Accuracy": np.round(pixAcc, 3),

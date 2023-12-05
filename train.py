@@ -21,9 +21,9 @@ from model.deeplabv3 import DeepLab
 
 #params
 data_dir = '..'
-batch_size = 2
-crop_size = 100
-base_size = 200
+batch_size = 16
+crop_size = 380
+base_size = 400
 scale = True
 augment = True
 
@@ -42,8 +42,8 @@ def main(config):
     
     unet = UNet(num_classes=train_dataloader.dataset.num_classes)
     deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
-    #pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
-    models = [deepLab]
+    pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
+    models = [unet,deepLab,pspnet]
 
     for model in models:
 
