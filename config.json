@@ -23,7 +23,7 @@
     },
 
     "loss": "FocalLoss",
-    "ignore_index": 255,
+    "ignore_index": -1,
     "lr_scheduler": {
         "type": "Poly",
         "args": {}

@@ -9,7 +9,8 @@ from torch.utils.data import Dataset
 from PIL import Image
 from torchvision import transforms
 from scipy import ndimage
-import os , glob
+import os 
+from glob import glob
 import pickle as pkl
 import matplotlib.pyplot as plt
 from utils import pallete
@@ -23,12 +24,9 @@ class ADE20KDataset(Dataset):
     def __init__(self,root, split, mean, std, base_size=None, augment=True, val=False,
                 crop_size=None, scale=True, flip=False, rotate=False, blur=False) -> None:
         super().__init__()
-        self.DATASET_PATH = 'ADE20K_2021_17_01'
-        index_file = 'index_ade20k.pkl'
+        self.DATASET_PATH = 'ADEChallengeData2016'
         self.num_classes = 150
         self.pallete = pallete.ADE20K_palette
-        with open('{}/{}'.format(self.DATASET_PATH, index_file), 'rb') as f:
-            self.index_ade20k = pkl.load(f)
         self.root = root
         self.split = split
         self.mean = mean
@@ -49,12 +47,10 @@ class ADE20KDataset(Dataset):
 
 
     def _set_files(self):
-        if self.split == "validation":
-            self.image_label_dir = os.path.join(self.DATASET_PATH, 'images/ADE', self.split)
-            self.files = [path for path in glob.glob(self.image_label_dir + '/**/*.jpg',recursive=True)]
-        elif self.split == "training":
-            self.files = [os.path.join(self.index_ade20k['folder'][i],self.index_ade20k['filename'][i]) 
-                          for i in range(len(self.index_ade20k['filename']))]
+        if self.split in  ["training", "validation"]:
+            self.image_dir = os.path.join(self.DATASET_PATH, 'images', self.split)
+            self.label_dir = os.path.join(self.DATASET_PATH, 'annotations', self.split)
+            self.files = [os.path.basename(path).split('.')[0] for path in glob(self.image_dir + '/*.jpg')]
         else: raise ValueError(f"Invalid split name {self.split}")
 
     def _val_augmentation(self, image, label):
@@ -143,20 +139,20 @@ class ADE20KDataset(Dataset):
         return image, label
     
     def _load_data(self, index):
-        image_path = self.files[index]
-        label_path = image_path.replace('.jpg', '_seg.png')
-        image = np.array(Image.open(image_path).convert('RGB'))
-        label = np.array(Image.open(label_path).convert('L'),dtype=np.int32)
+        image_id = self.files[index]
+        image_path = os.path.join(self.image_dir, image_id + '.jpg')
+        label_path = os.path.join(self.label_dir, image_id + '.png')
+        image = np.asarray(Image.open(image_path).convert('RGB'), dtype=np.float32)
+        label = np.asarray(Image.open(label_path), dtype=np.int32) -1  # from -1 to 149
         return image, label
     
     def one_hot_encode(self,target):
         target = torch.from_numpy(target)
-        colors = torch.unique(target.reshape(-1, target.size(2)), dim=0).numpy()
-        #print(colors,colors.shape)
-        target = target.permute(2, 0, 1).contiguous()
-        print(target)
-        mapping = {tuple(c): t for c, t in zip(colors.tolist(), range(len(colors)))}
-        mask = torch.empty(target.shape[1], target.shape[2], dtype=torch.long)
+        colors = ADE20K_palette_onehot
+        target = target.contiguous()
+        #print(target)
+        mapping = {tuple(c): t for c, t in zip(colors, range(len(colors)))}
+        mask = torch.empty(target.shape[0], target.shape[1], dtype=torch.long)
         for k in mapping:
             # Get all indices for current class
             idx = (target==torch.tensor(k, dtype=torch.uint8).unsqueeze(1).unsqueeze(2))
@@ -170,15 +166,12 @@ class ADE20KDataset(Dataset):
     
     def __getitem__(self, index):
         image, label = self._load_data(index)
-        #print(label,label.shape)
-        #plt.imshow(label)
-        #plt.show()
         if self.val:
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
-        label = torch.from_numpy(label).long()
-        image = Image.fromarray(image)
+        label = torch.from_numpy(np.array(label,dtype=np.int32)).long()
+        image = Image.fromarray(np.uint8(image))
         return self.normalize(self.to_tensor(image)), label
 
     def __repr__(self):
@@ -193,7 +186,7 @@ if __name__ == "__main__":
 
     MEAN = [0.48897059, 0.46548275, 0.4294]
     STD = [0.22861765, 0.22948039, 0.24054667]
-    root = '..'
+    root = '../ADEChallengeData2016'
     restore_transform = transforms.Compose([
             local_transforms.DeNormalize(MEAN, STD),
             transforms.ToPILImage()])

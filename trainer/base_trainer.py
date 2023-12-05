@@ -35,7 +35,7 @@ class BaseTrainer:
         self.model_type = self.model.model_type
         
         
-        self.loss = getattr(losses, config['loss'])()
+        self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
         
 
@@ -156,7 +156,7 @@ class BaseTrainer:
                 self.total_loss.update(loss.item())
 
                 if self.lr_sheduler is not None:
-                    self.lr_sheduler.step(loss.cpu().data.numpy())
+                    self.lr_sheduler.step()
 
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
