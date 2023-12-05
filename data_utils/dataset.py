@@ -152,6 +152,7 @@ class ADE20KDataset(Dataset):
         target = torch.from_numpy(target)
         colors = torch.unique(target.reshape(-1, target.size(2)), dim=0).numpy()
         target = target.permute(2, 0, 1).contiguous()
+
         mapping = {tuple(c): t for c, t in zip(colors.tolist(), range(len(colors)))}
         mask = torch.empty(target.shape[1], target.shape[2], dtype=torch.long)
         for k in mapping:
@@ -167,12 +168,11 @@ class ADE20KDataset(Dataset):
     
     def __getitem__(self, index):
         image, label = self._load_data(index)
-        label = self.one_hot_encode(label)
-        label = label.numpy()
         if self.val:
             image, label = self._val_augmentation(image, label)
         elif self.augment:
             image, label = self._augmentation(image, label)
+        label = self.one_hot_encode(label)
         image = Image.fromarray(image)
         return self.normalize(self.to_tensor(image)), torch.from_numpy(label).long()
 
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     restore_transform = transforms.Compose([
             local_transforms.DeNormalize(MEAN, STD),
             transforms.ToPILImage()])
-    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=700,crop_size=500)
+    dataset = ADE20KDataset(root=root,split='training',mean=MEAN,std=STD,base_size=400,crop_size=380)
     print("Dataset Length: ",len(dataset))
     i = 0
     for data in dataset:
