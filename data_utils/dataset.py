@@ -146,7 +146,7 @@ class ADE20KDataset(Dataset):
         image_path = self.files[index]
         label_path = image_path.replace('.jpg', '_seg.png')
         image = np.array(Image.open(image_path).convert('RGB'))
-        label = np.array(Image.open(label_path).convert('L'),dtype=np.int32) -1
+        label = np.array(Image.open(label_path).convert('L'),dtype=np.int32)
         return image, label
     
     def one_hot_encode(self,target):
