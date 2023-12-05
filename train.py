@@ -39,7 +39,7 @@ def main(config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
 
-    model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet101') 
+    model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
 
     #model = UNet(num_classes=train_dataloader.dataset.num_classes)
 
