@@ -40,6 +40,7 @@ class BaseTrainer:
             self.lr_sheduler = None
         
         self.loss = getattr(losses, config['loss'])()
+        self.scaler = torch.cuda.amp.GradScaler(enabled=True)
         
 
         self.writer_mode = 'train'
@@ -132,29 +133,31 @@ class BaseTrainer:
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
-            if self.lr_sheduler is not None:
-                self.lr_sheduler.step(epoch=epoch-1)
+            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=False):
+                if self.lr_sheduler is not None:
+                    self.lr_sheduler.step(epoch=epoch-1)
 
-            #FORWARD PASS
-            self.optimizer.zero_grad()
-            output = self.model(images)
+                #FORWARD PASS
+                self.optimizer.zero_grad()
+                output = self.model(images)
 
-            #BACKWARD PASS AND OPTIMIZE
-            if self.model.model_type[:3] == "PSP":
-                assert output[0].size()[2:] == labels.size()[1:]
-                assert output[0].size()[1] == self.num_classes 
-                loss = self.loss(output[0], labels)
-                loss += self.loss(output[1], labels) * 0.4
-                output = output[0]
-            else:
-                assert output.size()[2:] == labels.size()[1:]
-                assert output.size()[1] == self.num_classes 
-                loss = self.loss(output, labels)
+                #BACKWARD PASS AND OPTIMIZE
+                if self.model.model_type[:3] == "PSP":
+                    assert output[0].size()[2:] == labels.size()[1:]
+                    assert output[0].size()[1] == self.num_classes 
+                    loss = self.loss(output[0], labels)
+                    loss += self.loss(output[1], labels) * 0.4
+                    output = output[0]
+                else:
+                    assert output.size()[2:] == labels.size()[1:]
+                    assert output.size()[1] == self.num_classes 
+                    loss = self.loss(output, labels)
 
-            
-            loss.backward()
-            self.optimizer.step()
-            self.total_loss.update(loss.item())
+                
+                self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.total_loss.update(loss.item())
 
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
