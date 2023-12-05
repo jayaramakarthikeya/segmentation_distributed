@@ -102,7 +102,7 @@ class BaseTrainer:
     def train(self):
 
         self.model.summary()
-        for epoch in range(1,self.epochs):
+        for epoch in range(1,self.epochs+1):
             results = self._train_epoch(epoch)
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
@@ -132,7 +132,7 @@ class BaseTrainer:
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
-            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=False):
 
                 #FORWARD PASS
                 self.optimizer.zero_grad()

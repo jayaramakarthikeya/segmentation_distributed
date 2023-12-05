@@ -19,6 +19,7 @@ from model.pspnet import PSPNet
 from model.unet import UNet
 from model.deeplabv3 import DeepLab
 from model.upernet import UperNet
+from utils.helpers import initialize_weights
 
 #params
 data_dir = '..'
@@ -35,17 +36,17 @@ def main(config):
     torch.autograd.set_detect_anomaly(True)
 
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
-                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
+                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8)
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
-                                      crop_size=crop_size,base_size=base_size,scale=scale,augment=augment)
+                                      crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4)
 
     
     unet = UNet(num_classes=train_dataloader.dataset.num_classes)
     deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
     upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
-    models = [unet,deepLab,pspnet,upernet]
+    models = [deepLab,unet,pspnet,upernet]
 
     for model in models:
 

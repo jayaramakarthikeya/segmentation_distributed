@@ -9,6 +9,8 @@ def dir_exists(path):
     if not os.path.exists(path):
             os.makedirs(path)
 
+
+
 def initialize_weights(*models):
     for model in models:
         for m in model.modules():
