@@ -19,6 +19,7 @@ from model.pspnet import PSPNet
 from model.unet import UNet
 from model.deeplabv3 import DeepLab
 from model.upernet import UperNet
+from model.hrnet import HighResolutionNet
 from utils.helpers import initialize_weights
 from glob import glob
 
@@ -47,6 +48,7 @@ def main(config):
     deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
     upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
+    hrnet = HighResolutionNet(num_classes=train_dataloader.dataset.num_classes)
     
     model = pspnet
     #checkpoint_dir = './final_model'
