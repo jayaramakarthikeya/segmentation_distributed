@@ -7,3 +7,4 @@ build/
 dist/
 torch_syncbn.egg-info/
 ADEChallengeData2016/
+final_model/

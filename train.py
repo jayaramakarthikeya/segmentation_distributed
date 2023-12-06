@@ -20,6 +20,7 @@ from model.unet import UNet
 from model.deeplabv3 import DeepLab
 from model.upernet import UperNet
 from utils.helpers import initialize_weights
+from glob import glob
 
 #params
 data_dir = '..'
@@ -29,7 +30,7 @@ base_size = 400
 scale = True
 augment = True
 
-num_epochs = 180
+num_epochs = 80
 
 def main(config):
 
@@ -46,14 +47,20 @@ def main(config):
     deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
     upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
-    models = [deepLab,unet,pspnet,upernet]
-
-    for model in models:
-
-        gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
-                               val_loader=val_dataloader)
     
-        gpu_trainer.train()
+    model = pspnet
+    #checkpoint_dir = './final_model'
+    #checkpoint = torch.load('/home/ubuntu/segmentation_distributed/saved/DeepLab/12-06_04-22/checkpoint-epoch76.pth')
+    #start_epoch = checkpoint['epoch']
+    #model.load_state_dict(checkpoint['state_dict'])
+    #print(checkpoint['optimizer'])
+    #trainable_params = filter(lambda p:p.requires_grad, model.parameters())
+    #optimizer = getattr(torch.optim, config['optimizer']['type'])(model.parameters(), **config['optimizer']['args'])
+    
+    gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
+                            val_loader=val_dataloader,start_epoch=None)
+
+    gpu_trainer.train()
    
     
 

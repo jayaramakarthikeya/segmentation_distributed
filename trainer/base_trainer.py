@@ -21,7 +21,7 @@ from torchvision import transforms
 
 
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch):
         self.logger = logger
         self.train_loader = train_loader
         self.config = config
@@ -48,6 +48,7 @@ class BaseTrainer:
         self.save_period = cfg_trainer['save_period']
         lr_lambda = lambda epoch : pow((1 - (epoch/self.epochs)),0.9)
         self.lr_sheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,lr_lambda=lr_lambda)
+        self.lr_sheduler.last_epoch = start_epoch if start_epoch is not None else 1
 
         torch.backends.cudnn.benchmark = True
 
@@ -72,14 +73,14 @@ class BaseTrainer:
         self.writer = tensorboard.SummaryWriter(writer_dir)
 
         #Early Stopping
-        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode,trace_func=self.logger)
+        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
             local_transforms.DeNormalize(self.train_loader.MEAN, self.train_loader.STD),
             transforms.ToPILImage()])
         self.viz_transform = transforms.Compose([
-            transforms.Resize((321, 321)),
+            transforms.Resize((300, 300)),
             transforms.ToTensor()])
         
         self.log_step = self.config['trainer']['tensorboard_log_step']
@@ -102,8 +103,9 @@ class BaseTrainer:
     def train(self):
 
         self.model.summary()
-        for epoch in range(1,self.epochs+1):
+        for epoch in range(1,self.epochs):
             results = self._train_epoch(epoch)
+            self.early_stoping(results[self.mnt_metric],epoch,self.model)
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
 
@@ -111,8 +113,6 @@ class BaseTrainer:
             for k , v in results.items():
                 self.logger.info(f" {str(k)}: {v}")
             
-
-            self.early_stoping(results[self.mnt_metric],epoch,self.model)
 
             if self.early_stoping.early_stop:
                 self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
@@ -132,30 +132,32 @@ class BaseTrainer:
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
-            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=False):
+            try:
+                with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
-                #FORWARD PASS
-                self.optimizer.zero_grad()
-                output = self.model(images)
+                    #FORWARD PASS
+                    self.optimizer.zero_grad()
+                    output = self.model(images)
 
-                #BACKWARD PASS AND OPTIMIZE
-                if self.model.model_type[:3] == "PSP":
-                    assert output[0].size()[2:] == labels.size()[1:]
-                    assert output[0].size()[1] == self.num_classes 
-                    loss = self.loss(output[0], labels)
-                    loss += self.loss(output[1], labels) * 0.4
-                    output = output[0]
-                else:
-                    assert output.size()[2:] == labels.size()[1:]
-                    assert output.size()[1] == self.num_classes 
-                    loss = self.loss(output, labels)
+                    #BACKWARD PASS AND OPTIMIZE
+                    if self.model.model_type[:3] == "PSP":
+                        assert output[0].size()[2:] == labels.size()[1:]
+                        assert output[0].size()[1] == self.num_classes 
+                        loss = self.loss(output[0], labels)
+                        loss += self.loss(output[1], labels) * 0.4
+                        output = output[0]
+                    else:
+                        assert output.size()[2:] == labels.size()[1:]
+                        assert output.size()[1] == self.num_classes 
+                        loss = self.loss(output, labels)
 
-                
-                self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.total_loss.update(loss.item())
-
+                    
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                    self.total_loss.update(loss.item())
+            except RuntimeError:
+                continue
 
             # measure elapsed time
             self.batch_time.update(time.time() - tic)

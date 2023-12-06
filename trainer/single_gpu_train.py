@@ -3,7 +3,7 @@ from trainer.base_trainer import BaseTrainer
 import logging
 
 class SingleGPUTrainer(BaseTrainer):
-    def __init__(self, config, model, train_loader, val_loader):
+    def __init__(self, config, model, train_loader, val_loader,start_epoch):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.train_loader = train_loader
@@ -19,5 +19,5 @@ class SingleGPUTrainer(BaseTrainer):
         self.train_loader = train_loader
 
         self.num_classes = self.train_loader.dataset.num_classes
-        super(SingleGPUTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus)
+        super(SingleGPUTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch)
         

@@ -14,11 +14,13 @@
     },
 
     "optimizer": {
-        "type": "Adam",
+        "type": "SGD",
         "differential_lr": true,
         "args":{
             "lr": 0.01,
-            "weight_decay": 0.0001
+            "weight_decay": 0.0001,
+            "momentum": 0.9,
+            "nesterov": "True"
         }
     },
 
@@ -30,13 +32,13 @@
     },
 
     "trainer": {
-        "epochs": 180,
+        "epochs": 30,
         "save_dir": "saved/",
         "save_period": 10,
         "tensorboard_log_step": 1,
   
         "monitor": "max Mean_IoU",
-        "early_stop": 10,
+        "early_stop": 5,
         
         "tensorboard": true,
         "log_dir": "saved/runs",
