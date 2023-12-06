@@ -50,7 +50,7 @@ def main(config):
     upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
     hrnet = HighResolutionNet(num_classes=train_dataloader.dataset.num_classes)
     
-    model = pspnet
+    model = hrnet
     #checkpoint_dir = './final_model'
     checkpoint = torch.load('/home/ubuntu/segmentation_distributed/saved/PSPNet/12-06_15-09/checkpoint-epoch5.pth')
     start_epoch = checkpoint['epoch']
