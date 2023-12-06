@@ -14,8 +14,7 @@ import torch
 import torch.nn as nn
 import torch._utils
 import torch.nn.functional as F
-
-from torch.nn import BatchNorm2d
+from syncbn.nn import SyncBatchNorm , DistSyncBatchNorm
 from model.base_model import BaseModel
 
 relu_inplace = True
@@ -23,6 +22,8 @@ relu_inplace = True
 ALIGN_CORNERS = True
 BN_MOMENTUM = 0.1
 logger = logging.getLogger(__name__)
+
+BatchNorm2d = nn.BatchNorm2d
 
 class ModuleHelper:
 

@@ -7,6 +7,7 @@ from torchvision import models
 from model.base_model import BaseModel
 from utils.helpers import initialize_weights, set_trainable
 from itertools import chain
+from syncbn.nn import SyncBatchNorm , DistSyncBatchNorm
 
 class _PSPModule(nn.Module):
     def __init__(self, in_channels, bin_sizes, norm_layer):
@@ -41,7 +42,7 @@ class _PSPModule(nn.Module):
 class PSPNet(BaseModel):
     def __init__(self, num_classes, in_channels=3, backbone='resnet152', pretrained=True, use_aux=True, freeze_bn=False, freeze_backbone=False):
         super(PSPNet, self).__init__()
-        norm_layer = nn.BatchNorm2d
+        norm_layer = SyncBatchNorm
         self.model_type = "PSPNet"
         model = getattr(resnet, backbone)(pretrained, norm_layer=norm_layer)
         m_out_sz = model.fc.in_features
