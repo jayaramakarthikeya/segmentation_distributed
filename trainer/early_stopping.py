@@ -47,5 +47,8 @@ class EarlyStopping:
             'best_score': self.best_score,
             'config': self.config
         }
+        previous_checkpoint_pth = os.path.join(self.checkpoint_dir,f"checkpoint-epoch{epoch-1}.pth")
+        if os.path.exists(previous_checkpoint_pth):
+            os.remove(previous_checkpoint_pth)
         checkpoint_path = os.path.join(self.checkpoint_dir,f"checkpoint-epoch{epoch}.pth")
         torch.save(state, checkpoint_path)

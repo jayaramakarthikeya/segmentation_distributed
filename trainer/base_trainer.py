@@ -37,6 +37,7 @@ class BaseTrainer:
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+        self.start_epoch = start_epoch
         
 
         self.writer_mode = 'train'
@@ -48,7 +49,7 @@ class BaseTrainer:
         self.save_period = cfg_trainer['save_period']
         lr_lambda = lambda epoch : pow((1 - (epoch/self.epochs)),0.9)
         self.lr_sheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,lr_lambda=lr_lambda)
-        self.lr_sheduler.last_epoch = start_epoch if start_epoch is not None else 1
+        self.lr_sheduler.last_epoch = start_epoch if self.start_epoch is not None else 1
 
         torch.backends.cudnn.benchmark = True
 
@@ -103,7 +104,7 @@ class BaseTrainer:
     def train(self):
 
         self.model.summary()
-        for epoch in range(1,self.epochs):
+        for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
             self.early_stoping(results[self.mnt_metric],epoch,self.model)
             if epoch % self.config['trainer']['val_per_epochs'] == 0:
@@ -127,6 +128,7 @@ class BaseTrainer:
         tic = time.time()
         self._reset_metrics()
         tbar = tqdm(self.train_loader, ncols=130)
+        self.model.train()
 
         for batch_idx , (images,labels) in enumerate(tbar):
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
@@ -211,10 +213,14 @@ class BaseTrainer:
                 if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                     images , labels = images.to(self.device) , labels.to(self.device)
                 # LOSS
-                
-                output = self.model(images)
-                loss = self.loss(output, labels)
-                self.total_loss.update(loss.item())
+                try:
+                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                    
+                        output = self.model(images)
+                        loss = self.loss(output, labels)
+                        self.total_loss.update(loss.item())
+                except RuntimeError:
+                    continue
 
                 seg_metrics = eval_metrics(output, labels, self.num_classes)
                 self._update_seg_metrics(*seg_metrics)
