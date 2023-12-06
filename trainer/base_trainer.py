@@ -37,7 +37,7 @@ class BaseTrainer:
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
-        self.start_epoch = start_epoch
+        self.start_epoch = start_epoch if start_epoch is not None else 1
         
 
         self.writer_mode = 'train'
@@ -49,7 +49,8 @@ class BaseTrainer:
         self.save_period = cfg_trainer['save_period']
         lr_lambda = lambda epoch : pow((1 - (epoch/self.epochs)),0.9)
         self.lr_sheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer,lr_lambda=lr_lambda)
-        self.lr_sheduler.last_epoch = start_epoch if self.start_epoch is not None else 1
+        if self.start_epoch is not None:
+            self.lr_sheduler.last_epoch = self.start_epoch
 
         torch.backends.cudnn.benchmark = True
 

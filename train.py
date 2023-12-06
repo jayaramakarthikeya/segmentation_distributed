@@ -25,9 +25,9 @@ from glob import glob
 
 #params
 data_dir = '..'
-batch_size = 16
-crop_size = 380
-base_size = 400
+batch_size = 2
+crop_size = 100
+base_size = 150
 scale = True
 augment = True
 
@@ -52,15 +52,15 @@ def main(config):
     
     model = hrnet
     #checkpoint_dir = './final_model'
-    checkpoint = torch.load('/home/ubuntu/segmentation_distributed/saved/PSPNet/12-06_15-09/checkpoint-epoch5.pth')
-    start_epoch = checkpoint['epoch']
-    model.load_state_dict(checkpoint['state_dict'])
+    #checkpoint = torch.load('/home/ubuntu/segmentation_distributed/saved/PSPNet/12-06_15-09/checkpoint-epoch5.pth')
+    #start_epoch = checkpoint['epoch']
+    #model.load_state_dict(checkpoint['state_dict'])
     #print(checkpoint['optimizer'])
     #trainable_params = filter(lambda p:p.requires_grad, model.parameters())
     #optimizer = getattr(torch.optim, config['optimizer']['type'])(model.parameters(), **config['optimizer']['args'])
     
     gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=start_epoch)
+                            val_loader=val_dataloader,start_epoch=None)
 
     gpu_trainer.train()
    

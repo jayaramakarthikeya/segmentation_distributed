@@ -420,6 +420,7 @@ class HighResolutionNet(BaseModel):
         super(HighResolutionNet, self).__init__()
         ALIGN_CORNERS = True
         self.num_classes = num_classes
+        self.model_type = "HRNet"
 
         # stem net
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=2, padding=1,
@@ -430,7 +431,7 @@ class HighResolutionNet(BaseModel):
         self.bn2 = BatchNorm2d(64, momentum=BN_MOMENTUM)
         self.relu = nn.ReLU(inplace=relu_inplace)
 
-        num_channels = [64]
+        num_channels = 64
         block = blocks_dict['BOTTLENECK']
         num_blocks = 4
         self.layer1 = self._make_layer(block, 64, num_channels, num_blocks)
@@ -461,7 +462,7 @@ class HighResolutionNet(BaseModel):
         self.transition3 = self._make_transition_layer(
             pre_stage_channels, num_channels)
         self.stage4, pre_stage_channels = self._make_stage(
-             num_modules=1,num_branches=4,num_blocks=[4,4,4],num_channels=[32,64,128,256],block=block,fuse_method='SUM', num_inchannels=num_channels,multi_scale_output=True)
+             num_modules=1,num_branches=4,num_blocks=[4,4,4,4],num_channels=[32,64,128,256],block=block,fuse_method='SUM', num_inchannels=num_channels,multi_scale_output=True)
 
         last_inp_channels = np.int(np.sum(pre_stage_channels))
         ocr_mid_channels = 512
