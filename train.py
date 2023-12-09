@@ -22,6 +22,8 @@ from model.upernet import UperNet
 from model.hrnet import HighResolutionNet
 from utils.helpers import initialize_weights
 from glob import glob
+from trainer.ddp_trainer import DDPTrainer, cleanup
+from trainer.dp_trainer import DPTrainer
 
 #params
 data_dir = '..'
@@ -33,7 +35,7 @@ augment = True
 
 num_epochs = 80
 
-def main(config):
+def main(args, config):
 
     torch.autograd.set_detect_anomaly(True)
 
@@ -43,14 +45,25 @@ def main(config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4)
 
+    if args.model == "unet":
+        model = UNet(num_classes=train_dataloader.dataset.num_classes)
     
-    unet = UNet(num_classes=train_dataloader.dataset.num_classes)
-    deepLab = DeepLab(num_classes=train_dataloader.dataset.num_classes)
-    pspnet = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
-    upernet = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
-    hrnet = HighResolutionNet(num_classes=train_dataloader.dataset.num_classes)
+    elif args.model == "deeplab":
+        model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     
-    model = hrnet
+    elif args.model == "pspnet":
+        model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
+
+    elif args.model == "upernet":
+        model = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
+    
+    elif args.model == "hrnet":
+        model = HighResolutionNet(num_classes=train_dataloader.dataset.num_classes)
+    
+    else:
+        print("NO MODEL CONFIGURED. USE -m FLAG")
+        exit()
+    
     #checkpoint_dir = './final_model'
     #checkpoint = torch.load('/home/ubuntu/segmentation_distributed/saved/PSPNet/12-06_15-09/checkpoint-epoch5.pth')
     #start_epoch = checkpoint['epoch']
@@ -58,11 +71,24 @@ def main(config):
     #print(checkpoint['optimizer'])
     #trainable_params = filter(lambda p:p.requires_grad, model.parameters())
     #optimizer = getattr(torch.optim, config['optimizer']['type'])(model.parameters(), **config['optimizer']['args'])
+
+    if args.parallel == 'dp':
+        gpu_trainer = DPTrainer(config=config, model=model, train_loader=train_dataloader,
+                            val_loader=val_dataloader,start_epoch=None)
     
-    gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
+    elif args.parallel == 'ddp':
+        gpu_trainer = DDPTrainer(config=config, model=model, train_loader=train_dataloader,
+                            val_loader=val_dataloader,start_epoch=None)
+
+    else:
+    
+        gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                             val_loader=val_dataloader,start_epoch=None)
 
     gpu_trainer.train()
+
+    if config.parallel == 'ddp':
+        cleanup()
    
     
 
@@ -73,6 +99,10 @@ if __name__ == '__main__':
                         help='Path to the config file (default: config.json)')
     parser.add_argument('-d', '--device', default=None, type=str,
                            help='indices of GPUs to enable (default: all)')
+    parser.add_argument('-p', '--parallel', default=None, type=str,
+                           help='Which Parallel algo? (eg. dp, ddp) (default: Single GPU)')
+    parser.add_argument('-m', '--model', default=None, type=str,
+                           help='Which model do you want to use? Unet, Deeplab, PSP, UperNet')
     args = parser.parse_args()
 
     config = json.load(open(args.config))
@@ -80,4 +110,4 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
     
-    main(config)
+    main(args, config)
