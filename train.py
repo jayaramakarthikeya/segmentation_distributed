@@ -52,6 +52,7 @@ def main(args, config):
         model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
     
     elif args.model == "pspnet":
+        print("INITIALIZING PSPNET")
         model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
 
     elif args.model == "upernet":
@@ -73,6 +74,7 @@ def main(args, config):
     #optimizer = getattr(torch.optim, config['optimizer']['type'])(model.parameters(), **config['optimizer']['args'])
 
     if args.parallel == 'dp':
+        print("USING DATA PARALLEL")
         gpu_trainer = DPTrainer(config=config, model=model, train_loader=train_dataloader,
                             val_loader=val_dataloader,start_epoch=None)
     
@@ -85,10 +87,11 @@ def main(args, config):
         gpu_trainer = SingleGPUTrainer(config=config, model=model, train_loader=train_dataloader,
                             val_loader=val_dataloader,start_epoch=None)
 
+    print("TRAINING")
     gpu_trainer.train()
 
     if config.parallel == 'ddp':
-        cleanup()
+        gpu_trainer.cleanup()
    
     
 

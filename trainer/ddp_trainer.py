@@ -8,33 +8,6 @@ import boto3
 import socket
 
 
-def setup(rank, world_size, localhost='localhost', master_port='12355'):
-    os.environ['MASTER_ADDR'] =  localhost
-    os.environ['MASTER_PORT'] =  master_port
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
-
-def cleanup():
-    dist.destroy_process_group()
-
-def get_rank_world_size():
-    ec2 = boto3.resource('ec2')
-    instances = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}])
-
-    # Assuming each instance has the same number of GPUs
-    gpus_per_instance = 4
-
-    # Create a list of private IP addresses
-    private_ips = sorted([instance.private_ip_address for instance in instances])
-
-    # Set world_size
-    world_size = len(private_ips) * gpus_per_instance
-
-    # Get the rank for the current instance
-    current_ip = socket.gethostbyname(socket.gethostname())
-    rank = private_ips.index(current_ip) * gpus_per_instance
-
-    return rank, world_size
-
 class DDPTrainer(BaseTrainer):
     def __init__(self, config, model, train_loader, val_loader,start_epoch, localhost='localhost', master_port='12355'):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -42,9 +15,9 @@ class DDPTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.n_gpu = self.config['n_gpu']
 
-        rank, world_size = get_rank_world_size()
+        rank, world_size = self.get_rank_world_size()
 
-        setup(rank, world_size)
+        self.setup(rank, world_size)
         self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
 
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model).to(rank)
@@ -57,3 +30,30 @@ class DDPTrainer(BaseTrainer):
 
         self.num_classes = self.train_loader.dataset.num_classes
         super(DDPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch)
+
+    def setup(rank, world_size, localhost='localhost', master_port='12355'):
+        os.environ['MASTER_ADDR'] =  localhost
+        os.environ['MASTER_PORT'] =  master_port
+        dist.init_process_group("nccl", rank=rank, world_size=world_size)
+
+    def cleanup():
+        dist.destroy_process_group()
+
+    def get_rank_world_size():
+        ec2 = boto3.resource('ec2')
+        instances = ec2.instances.filter(Filters=[{'Name': 'instance-state-name', 'Values': ['running']}])
+
+        # Assuming each instance has the same number of GPUs
+        gpus_per_instance = 4
+
+        # Create a list of private IP addresses
+        private_ips = sorted([instance.private_ip_address for instance in instances])
+
+        # Set world_size
+        world_size = len(private_ips) * gpus_per_instance
+
+        # Get the rank for the current instance
+        current_ip = socket.gethostbyname(socket.gethostname())
+        rank = private_ips.index(current_ip) * gpus_per_instance
+
+        return rank, world_size
