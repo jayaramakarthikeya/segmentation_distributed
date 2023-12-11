@@ -140,7 +140,7 @@ class BaseTrainer:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             
-            if self.parallel_type == None:
+            if self.model.parallel_type == None:
                 try:
                     with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
