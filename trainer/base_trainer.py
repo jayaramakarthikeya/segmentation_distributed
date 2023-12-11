@@ -34,7 +34,7 @@ class BaseTrainer:
         self.val_loader = val_loader
         self.model_type = self.model.module.model_type
         
-        self.parallel_type = parallel_type
+        self.parallel_type = model.parallel_type
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
 
@@ -189,7 +189,7 @@ class BaseTrainer:
                     assert output.size()[2:] == labels.size()[1:]
                     assert output.size()[1] == self.num_classes 
                     loss = self.loss(output, labels)
-                
+
                 print("LOSS BACKWARD#######")
                 loss.backward()
                 self.optimizer.step()
