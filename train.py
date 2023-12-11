@@ -22,7 +22,7 @@ from model.upernet import UperNet
 from model.hrnet import HighResolutionNet
 from utils.helpers import initialize_weights
 from glob import glob
-from trainer.ddp_trainer import DDPTrainer, cleanup
+from trainer.ddp_trainer import DDPTrainer
 from trainer.dp_trainer import DPTrainer
 
 #params
