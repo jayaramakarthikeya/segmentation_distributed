@@ -200,7 +200,7 @@ class BaseTrainer:
             # FOR EVAL
             seg_metrics = eval_metrics(output, labels, self.num_classes)
             self._update_seg_metrics(*seg_metrics)
-            pixAcc, mIoU, _ = self._get_seg_metrics().values()
+            pixAcc, mIoU = self._get_seg_metrics().values()
 
 
             # PRINT INFO
@@ -293,7 +293,7 @@ class BaseTrainer:
                     val_visual.append([images[0].data.cpu(), target_np[0], output_np[0]])
 
                 # PRINT INFO
-                pixAcc, mIoU, _ = self._get_seg_metrics().values()
+                pixAcc, mIoU = self._get_seg_metrics().values()
                 tbar.set_description('EVAL ({}) | Loss: {:.3f}, PixelAcc: {:.2f}, Mean IoU: {:.2f} |'.format( epoch,
                                                 self.total_loss.average,
                                                 pixAcc, mIoU))
@@ -344,6 +344,5 @@ class BaseTrainer:
         mIoU = np.mean(IoU)
         return {
             "Pixel_Accuracy": np.round(pixAcc, 3),
-            "Mean_IoU": mIoU,
-            "Class_IoU": dict(zip(range(self.num_classes), np.round(IoU, 3)))
+            "Mean_IoU": mIoU
         }
