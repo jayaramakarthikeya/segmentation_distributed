@@ -131,6 +131,8 @@ class UperNet(BaseModel):
         else:
             feature_channels = [256, 512, 1024, 2048]
         
+        self.parallel_type = parallel_type
+        
         if parallel_type == 'dp':
             self.norm_layer = SyncBatchNorm
         elif parallel_type == 'ddp':

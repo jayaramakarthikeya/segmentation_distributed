@@ -44,6 +44,8 @@ class PSPNet(BaseModel):
                   pretrained=True, use_aux=True, freeze_bn=False, freeze_backbone=False):
         super(PSPNet, self).__init__()
 
+        self.parallel_type = parallel_type
+
         if parallel_type == 'dp':
             norm_layer = SyncBatchNorm
         elif parallel_type == 'ddp':
