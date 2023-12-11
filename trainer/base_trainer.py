@@ -139,8 +139,9 @@ class BaseTrainer:
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
-            try:
-                if self.parallel_type == None:
+            
+            if self.parallel_type == None:
+                try:
                     with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
                         #FORWARD PASS
@@ -164,31 +165,33 @@ class BaseTrainer:
                         self.scaler.step(self.optimizer)
                         self.scaler.update()
                         self.total_loss.update(loss.item())
+
+                except RuntimeError:
+                    continue
+
                     
+            else:
+                self.optimizer.zero_grad()
+                output = self.model(images)
+
+                if self.model.module.model_type[:3] == "PSP":
+                    assert output[0].size()[2:] == labels.size()[1:]
+                    assert output[0].size()[1] == self.num_classes 
+                    loss = self.loss(output[0], labels)
+                    loss += self.loss(output[1], labels) * 0.4
+                    output = output[0]
                 else:
-                    self.optimizer.zero_grad()
-                    output = self.model(images)
+                    assert output.size()[2:] == labels.size()[1:]
+                    assert output.size()[1] == self.num_classes 
+                    loss = self.loss(output, labels)
 
-                    if self.model.module.model_type[:3] == "PSP":
-                        assert output[0].size()[2:] == labels.size()[1:]
-                        assert output[0].size()[1] == self.num_classes 
-                        loss = self.loss(output[0], labels)
-                        loss += self.loss(output[1], labels) * 0.4
-                        output = output[0]
-                    else:
-                        assert output.size()[2:] == labels.size()[1:]
-                        assert output.size()[1] == self.num_classes 
-                        loss = self.loss(output, labels)
-
-                    loss.backward()
-                    self.optimizer.step()
-                    print("********",loss.item().dtype)
-                    self.total_loss.update(loss.item())
+                loss.backward()
+                self.optimizer.step()
+                print("********",loss.item().dtype)
+                self.total_loss.update(loss.item())
 
 
-            except RuntimeError:
-                continue
-
+            
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
             tic = time.time()
