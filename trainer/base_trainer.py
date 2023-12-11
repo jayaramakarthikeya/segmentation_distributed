@@ -182,6 +182,7 @@ class BaseTrainer:
 
                     loss.backward()
                     self.optimizer.step()
+                    print("********",loss.item().dtype)
                     self.total_loss.update(loss.item())
 
 
