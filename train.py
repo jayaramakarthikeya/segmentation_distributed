@@ -27,9 +27,9 @@ from trainer.dp_trainer import DPTrainer
 
 #params
 data_dir = '..'
-batch_size = 2
-crop_size = 100
-base_size = 150
+batch_size = 16
+crop_size = 380
+base_size = 400
 scale = True
 augment = True
 
@@ -38,7 +38,6 @@ num_epochs = 80
 def main(args, config):
 
     torch.autograd.set_detect_anomaly(True)
-
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
                                   crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8)
     

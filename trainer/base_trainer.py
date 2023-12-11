@@ -18,10 +18,10 @@ from utils.helpers import colorize_mask
 from utils.metrics import eval_metrics, AverageMeter
 from torchvision.utils import make_grid
 from torchvision import transforms
-
+import torch.distributed as dist
 
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch, parallel_type=None):
         self.logger = logger
         self.train_loader = train_loader
         self.config = config
@@ -34,9 +34,13 @@ class BaseTrainer:
         self.val_loader = val_loader
         self.model_type = self.model.module.model_type
         
+        self.parallel_type = parallel_type
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
-        self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+
+        if self.parallel_type == None:
+            self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+
         self.start_epoch = start_epoch if start_epoch is not None else 1
         
 
@@ -136,13 +140,35 @@ class BaseTrainer:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             try:
-                with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                if self.parallel_type == None:
+                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
-                    #FORWARD PASS
+                        #FORWARD PASS
+                        self.optimizer.zero_grad()
+                        output = self.model(images)
+
+                        #BACKWARD PASS AND OPTIMIZE
+                        if self.model.module.model_type[:3] == "PSP":
+                            assert output[0].size()[2:] == labels.size()[1:]
+                            assert output[0].size()[1] == self.num_classes 
+                            loss = self.loss(output[0], labels)
+                            loss += self.loss(output[1], labels) * 0.4
+                            output = output[0]
+                        else:
+                            assert output.size()[2:] == labels.size()[1:]
+                            assert output.size()[1] == self.num_classes 
+                            loss = self.loss(output, labels)
+
+                        
+                        self.scaler.scale(loss).backward()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        self.total_loss.update(loss.item())
+                    
+                else:
                     self.optimizer.zero_grad()
                     output = self.model(images)
 
-                    #BACKWARD PASS AND OPTIMIZE
                     if self.model.module.model_type[:3] == "PSP":
                         assert output[0].size()[2:] == labels.size()[1:]
                         assert output[0].size()[1] == self.num_classes 
@@ -154,11 +180,11 @@ class BaseTrainer:
                         assert output.size()[1] == self.num_classes 
                         loss = self.loss(output, labels)
 
-                    
-                    self.scaler.scale(loss).backward()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
+                    loss.backward()
+                    self.optimizer.step()
                     self.total_loss.update(loss.item())
+
+
             except RuntimeError:
                 continue
 
@@ -199,6 +225,40 @@ class BaseTrainer:
 
         #if self.lr_scheduler is not None: self.lr_scheduler.step()
         return log
+    
+    def get_world_size(self):
+        if not dist.is_available():
+            return 1
+        if not dist.is_initialized():
+            return 1
+        return dist.get_world_size()
+    
+    def reduce_loss_dict(self, loss_dict):
+        """
+        Reduce the loss dictionary from all processes so that process with rank
+        0 has the averaged results. Returns a dict with the same fields as
+        loss_dict, after reduction.
+        """
+        world_size = self.get_world_size()
+        if world_size < 2:
+            return loss_dict
+        with torch.no_grad():
+            loss_names = []
+            all_losses = []
+            total_loss = 0.0
+            for k in sorted(loss_dict.keys()):
+                loss_names.append(k)
+                all_losses.append(loss_dict[k])
+                total_loss += loss_dict[k]
+            all_losses = torch.stack(all_losses, dim=0)
+            dist.reduce(all_losses, dst=0)
+            if dist.get_rank() == 0:
+                # only main process gets accumulated, so only divide by
+                # world_size in this case
+                all_losses /= world_size
+            reduced_losses = {k: v for k, v in zip(loss_names, all_losses)}
+            
+        return total_loss#reduced_losses
 
     def _valid_epoch(self, epoch):
         self.logger.info('\n###### EVALUATION ######')

@@ -2,10 +2,11 @@
 import sys
 sys.path.append('../')
 import warnings
-try:
-    from queue import Queue
-except ImportError:
-    from Queue import Queue
+from queue import Queue
+# try:
+#     from queue import Queue
+# except ImportError:
+#     from Queue import Queue
 
 import torch
 from torch.nn.modules.batchnorm import _BatchNorm
