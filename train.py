@@ -44,21 +44,13 @@ def main(args, config):
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4)
 
-    if args.model == "unet":
-        model = UNet(num_classes=train_dataloader.dataset.num_classes)
     
-    elif args.model == "deeplab":
-        model = DeepLab(num_classes=train_dataloader.dataset.num_classes)
-    
-    elif args.model == "pspnet":
+    if args.model == "pspnet":
         print("INITIALIZING PSPNET")
-        model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50') 
+        model = PSPNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50', parallel_type=args.parallel) 
 
     elif args.model == "upernet":
-        model = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50')
-    
-    elif args.model == "hrnet":
-        model = HighResolutionNet(num_classes=train_dataloader.dataset.num_classes)
+        model = UperNet(num_classes=train_dataloader.dataset.num_classes,backbone='resnet50', parallel_type=args.parallel)
     
     else:
         print("NO MODEL CONFIGURED. USE -m FLAG")
