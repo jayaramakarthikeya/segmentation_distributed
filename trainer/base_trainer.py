@@ -154,7 +154,7 @@ class BaseTrainer:
                     output = self.model(images)
 
                     #BACKWARD PASS AND OPTIMIZE
-                    if self.model.model_type[:3] == "PSP":
+                    if self.model_type[:3] == "PSP":
                         assert output[0].size()[2:] == labels.size()[1:]
                         assert output[0].size()[1] == self.num_classes 
                         loss = self.loss(output[0], labels)

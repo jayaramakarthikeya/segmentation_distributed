@@ -48,7 +48,7 @@ class PSPNet(BaseModel):
 
         if parallel_type == 'dp':
             print("PSP NET using sync BN") 
-            norm_layer = nn.BatchNorm2d#SyncBatchNorm
+            norm_layer = SyncBatchNorm
         elif parallel_type == 'ddp':
             norm_layer = DistSyncBatchNorm
         else:
