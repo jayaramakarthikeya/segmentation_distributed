@@ -67,11 +67,11 @@ def main(args, config):
     if args.parallel == 'dp':
         print("USING DATA PARALLEL")
         gpu_trainer = DPTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=None, parallel_type = args.parallel)
+                            val_loader=val_dataloader,start_epoch=None, parallel_type='dp')
     
     elif args.parallel == 'ddp':
         gpu_trainer = DDPTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=None, parallel_type = args.parallel)
+                            val_loader=val_dataloader,start_epoch=None, parallel_type='ddp')
 
     else:
     

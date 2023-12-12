@@ -34,7 +34,7 @@ class BaseTrainer:
         self.val_loader = val_loader
         self.model_type = self.model.module.model_type
         
-        self.parallel_type = model.parallel_type
+        self.parallel_type = parallel_type
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
 
