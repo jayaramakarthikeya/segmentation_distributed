@@ -5,7 +5,7 @@ import logging
 import torch.nn as nn
 
 class DPTrainer(BaseTrainer):
-    def __init__(self, config, model, train_loader, val_loader,start_epoch):
+    def __init__(self, config, model, train_loader, val_loader,start_epoch, parallel_type = None):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.train_loader = train_loader
@@ -15,6 +15,8 @@ class DPTrainer(BaseTrainer):
         self.model = nn.DataParallel(model) 
         self.model.to(self.device)
         self.train_loader = train_loader
+        
+        self.parallel_type = parallel_type
 
         self.num_classes = self.train_loader.dataset.num_classes
-        super(DPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch)
+        super(DPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch, parallel_type = self.parallel_type)
