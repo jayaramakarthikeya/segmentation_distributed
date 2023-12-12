@@ -32,7 +32,7 @@ class BaseTrainer:
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
-        self.model_type = self.model.module.model_type
+        self.model_type = "PSPnet"#self.model.model_type
         
         self.parallel_type = parallel_type
         
@@ -108,7 +108,7 @@ class BaseTrainer:
 
     def train(self):
 
-        self.model.module.summary()
+        #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
             self.early_stoping(results[self.mnt_metric],epoch,self.model)
@@ -133,7 +133,7 @@ class BaseTrainer:
         tic = time.time()
         self._reset_metrics()
         tbar = tqdm(self.train_loader, ncols=130)
-        self.model.module.train()
+        self.model.train()
 
         #print("In train epoch&&&&&")
 
@@ -154,7 +154,7 @@ class BaseTrainer:
                         output = self.model(images)
 
                         #BACKWARD PASS AND OPTIMIZE
-                        if self.model.module.model_type[:3] == "PSP":
+                        if self.model.model_type[:3] == "PSP":
                             assert output[0].size()[2:] == labels.size()[1:]
                             assert output[0].size()[1] == self.num_classes 
                             loss = self.loss(output[0], labels)

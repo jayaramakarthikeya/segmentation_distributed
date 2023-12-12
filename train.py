@@ -27,7 +27,7 @@ from trainer.dp_trainer import DPTrainer
 
 #params
 data_dir = '..'
-batch_size = 16
+batch_size = 32
 crop_size = 380
 base_size = 400
 scale = True

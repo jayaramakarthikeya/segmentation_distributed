@@ -1,5 +1,5 @@
 
-
+import torch
 from trainer.base_trainer import BaseTrainer
 import logging
 import torch.nn as nn
@@ -12,8 +12,12 @@ class DPTrainer(BaseTrainer):
         self.n_gpu = self.config['n_gpu']
 
         self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
-        self.model = nn.DataParallel(model) 
-        self.model.to(self.device)
+        
+        dev_count = torch.cuda.device_count()
+        print(f"Available GPUs: {dev_count}")
+        self.model = nn.DataParallel(model, device_ids=list(range(dev_count))) 
+        #self.model.to(self.device)
+        self.model.to('cuda:0')
         self.train_loader = train_loader
         
         self.parallel_type = parallel_type
