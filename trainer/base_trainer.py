@@ -38,8 +38,8 @@ class BaseTrainer:
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
 
-        if self.parallel_type == None:
-            self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+        #if self.parallel_type == None:
+        self.scaler = torch.cuda.amp.GradScaler(enabled=True)
 
         self.start_epoch = start_epoch if start_epoch is not None else 1
         
@@ -143,58 +143,58 @@ class BaseTrainer:
             self.data_time.update(time.time() - tic)
             
 
-            if self.parallel_type == None:
+            #if self.parallel_type == None:
                 #print("Parallel type None)))))))") 
 
-                try:
-                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+            try:
+                with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
-                        #FORWARD PASS
-                        self.optimizer.zero_grad()
-                        output = self.model(images)
+                    #FORWARD PASS
+                    self.optimizer.zero_grad()
+                    output = self.model(images)
 
-                        #BACKWARD PASS AND OPTIMIZE
-                        if self.model.model_type[:3] == "PSP":
-                            assert output[0].size()[2:] == labels.size()[1:]
-                            assert output[0].size()[1] == self.num_classes 
-                            loss = self.loss(output[0], labels)
-                            loss += self.loss(output[1], labels) * 0.4
-                            output = output[0]
-                        else:
-                            assert output.size()[2:] == labels.size()[1:]
-                            assert output.size()[1] == self.num_classes 
-                            loss = self.loss(output, labels)
-
-                        
-                        self.scaler.scale(loss).backward()
-                        self.scaler.step(self.optimizer)
-                        self.scaler.update()
-                        self.total_loss.update(loss.item())
-
-                except RuntimeError:
-                    continue
+                    #BACKWARD PASS AND OPTIMIZE
+                    if self.model.model_type[:3] == "PSP":
+                        assert output[0].size()[2:] == labels.size()[1:]
+                        assert output[0].size()[1] == self.num_classes 
+                        loss = self.loss(output[0], labels)
+                        loss += self.loss(output[1], labels) * 0.4
+                        output = output[0]
+                    else:
+                        assert output.size()[2:] == labels.size()[1:]
+                        assert output.size()[1] == self.num_classes 
+                        loss = self.loss(output, labels)
 
                     
-            else:
-                self.optimizer.zero_grad()
-                output = self.model(images)
-                #print("************in DP train loop")
-                if self.model.module.model_type[:3] == "PSP":
-                    assert output[0].size()[2:] == labels.size()[1:]
-                    assert output[0].size()[1] == self.num_classes 
-                    loss = self.loss(output[0], labels)
-                    loss += self.loss(output[1], labels) * 0.4
-                    output = output[0]
-                else:
-                    assert output.size()[2:] == labels.size()[1:]
-                    assert output.size()[1] == self.num_classes 
-                    loss = self.loss(output, labels)
+                    self.scaler.scale(loss).backward()
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                    self.total_loss.update(loss.item())
 
-                #print("LOSS BACKWARD#######")
-                loss.backward()
-                self.optimizer.step()
-                #print("********",loss.item().dtype)
-                self.total_loss.update(loss.item())
+            except RuntimeError:
+                continue
+
+                    
+            # else:
+            #     self.optimizer.zero_grad()
+            #     output = self.model(images)
+            #     #print("************in DP train loop")
+            #     if self.model.module.model_type[:3] == "PSP":
+            #         assert output[0].size()[2:] == labels.size()[1:]
+            #         assert output[0].size()[1] == self.num_classes 
+            #         loss = self.loss(output[0], labels)
+            #         loss += self.loss(output[1], labels) * 0.4
+            #         output = output[0]
+            #     else:
+            #         assert output.size()[2:] == labels.size()[1:]
+            #         assert output.size()[1] == self.num_classes 
+            #         loss = self.loss(output, labels)
+
+            #     #print("LOSS BACKWARD#######")
+            #     loss.backward()
+            #     self.optimizer.step()
+            #     #print("********",loss.item().dtype)
+            #     self.total_loss.update(loss.item())
 
 
             
