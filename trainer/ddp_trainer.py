@@ -20,7 +20,7 @@ class DDPTrainer(BaseTrainer):
         self.setup(rank, world_size)
         self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
 
-        model = nn.SyncBatchNorm.convert_sync_batchnorm(model).to(rank)
+        #model = nn.SyncBatchNorm.convert_sync_batchnorm(model).to(rank)
 
         self.model = DDP(model, device_ids=[rank])
 
