@@ -24,9 +24,5 @@ class DPTrainer(BaseTrainer):
         self.parallel_type = parallel_type
 
         self.num_classes = self.train_loader.dataset.num_classes
-<<<<<<< HEAD
-        super(DPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch, parallel_type = self.parallel_type)
-=======
         super(DPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch, 
                                        parallel_type=parallel_type)
->>>>>>> ad85184 (updated self.parallel type)
