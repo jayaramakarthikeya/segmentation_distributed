@@ -411,7 +411,7 @@ std::vector<at::Tensor> Expectation_Forward_CUDA(
   cudaStream_t stream = at::cuda::getCurrentCUDAStream();
   dim3 blocks(input_.size(1));
   dim3 threads(getNumThreads(input_.size(2)));
-  AT_DISPATCH_FLOATING_TYPES(input_.scalar_type(), "SumSquare_forward_CUDA", ([&] {
+  AT_DISPATCH_FLOATING_TYPES_AND_HALF(input_.scalar_type(), "SumSquare_forward_CUDA", ([&] {
     scalar_t norm = scalar_t(1) / (input_.size(0) * input_.size(2));
     /* Device tensors */
     DeviceTensor<scalar_t, 3> input = devicetensor<scalar_t, 3>(input_);
