@@ -146,7 +146,7 @@ class BaseTrainer:
             #if self.parallel_type == None:
                 #print("Parallel type None)))))))") 
 
-            """ try:
+            try:
                 with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
                     #print("heufheuf@@@@")
                     #FORWARD PASS
@@ -171,11 +171,11 @@ class BaseTrainer:
                     self.total_loss.update(loss.item())
 
             except RuntimeError:
-                continue """
+                continue
 
                     
             #else:
-            self.optimizer.zero_grad()
+            """ self.optimizer.zero_grad()
             output = self.model(images)
             #print("************in DP train loop")
             if self.model.module.model_type[:3] == "PSP":
@@ -192,7 +192,7 @@ class BaseTrainer:
             #print("LOSS BACKWARD#######")
             loss.backward()
             self.optimizer.step()
-            self.total_loss.update(loss.item())
+            self.total_loss.update(loss.item()) """
 
 
             
