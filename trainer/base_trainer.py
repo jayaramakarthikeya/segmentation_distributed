@@ -18,10 +18,10 @@ from utils.helpers import colorize_mask
 from utils.metrics import eval_metrics, AverageMeter
 from torchvision.utils import make_grid
 from torchvision import transforms
-
+import torch.distributed as dist
 
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch, parallel_type=None):
         self.logger = logger
         self.train_loader = train_loader
         self.config = config
@@ -32,11 +32,15 @@ class BaseTrainer:
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
-        self.model_type = self.model.model_type
+        self.model_type = "PSPnet"#self.model.model_type
         
+        self.parallel_type = parallel_type
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
+
+        #if self.parallel_type == None:
         self.scaler = torch.cuda.amp.GradScaler(enabled=True)
+
         self.start_epoch = start_epoch if start_epoch is not None else 1
         
 
@@ -104,7 +108,7 @@ class BaseTrainer:
 
     def train(self):
 
-        self.model.summary()
+        #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
             self.early_stoping(results[self.mnt_metric],epoch,self.model)
@@ -131,10 +135,17 @@ class BaseTrainer:
         tbar = tqdm(self.train_loader, ncols=130)
         self.model.train()
 
+        #print("In train epoch&&&&&")
+
         for batch_idx , (images,labels) in enumerate(tbar):
             if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
+            
+
+            #if self.parallel_type == None:
+                #print("Parallel type None)))))))") 
+
             try:
                 with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
@@ -143,7 +154,7 @@ class BaseTrainer:
                     output = self.model(images)
 
                     #BACKWARD PASS AND OPTIMIZE
-                    if self.model.model_type[:3] == "PSP":
+                    if self.model_type[:3] == "PSP":
                         assert output[0].size()[2:] == labels.size()[1:]
                         assert output[0].size()[1] == self.num_classes 
                         loss = self.loss(output[0], labels)
@@ -159,9 +170,34 @@ class BaseTrainer:
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
                     self.total_loss.update(loss.item())
+
             except RuntimeError:
                 continue
 
+                    
+            # else:
+            #     self.optimizer.zero_grad()
+            #     output = self.model(images)
+            #     #print("************in DP train loop")
+            #     if self.model.module.model_type[:3] == "PSP":
+            #         assert output[0].size()[2:] == labels.size()[1:]
+            #         assert output[0].size()[1] == self.num_classes 
+            #         loss = self.loss(output[0], labels)
+            #         loss += self.loss(output[1], labels) * 0.4
+            #         output = output[0]
+            #     else:
+            #         assert output.size()[2:] == labels.size()[1:]
+            #         assert output.size()[1] == self.num_classes 
+            #         loss = self.loss(output, labels)
+
+            #     #print("LOSS BACKWARD#######")
+            #     loss.backward()
+            #     self.optimizer.step()
+            #     #print("********",loss.item().dtype)
+            #     self.total_loss.update(loss.item())
+
+
+            
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
             tic = time.time()
@@ -174,7 +210,7 @@ class BaseTrainer:
             # FOR EVAL
             seg_metrics = eval_metrics(output, labels, self.num_classes)
             self._update_seg_metrics(*seg_metrics)
-            pixAcc, mIoU, _ = self._get_seg_metrics().values()
+            pixAcc, mIoU = self._get_seg_metrics().values()
 
 
             # PRINT INFO
@@ -199,11 +235,45 @@ class BaseTrainer:
 
         #if self.lr_scheduler is not None: self.lr_scheduler.step()
         return log
+    
+    def get_world_size(self):
+        if not dist.is_available():
+            return 1
+        if not dist.is_initialized():
+            return 1
+        return dist.get_world_size()
+    
+    def reduce_loss_dict(self, loss_dict):
+        """
+        Reduce the loss dictionary from all processes so that process with rank
+        0 has the averaged results. Returns a dict with the same fields as
+        loss_dict, after reduction.
+        """
+        world_size = self.get_world_size()
+        if world_size < 2:
+            return loss_dict
+        with torch.no_grad():
+            loss_names = []
+            all_losses = []
+            total_loss = 0.0
+            for k in sorted(loss_dict.keys()):
+                loss_names.append(k)
+                all_losses.append(loss_dict[k])
+                total_loss += loss_dict[k]
+            all_losses = torch.stack(all_losses, dim=0)
+            dist.reduce(all_losses, dst=0)
+            if dist.get_rank() == 0:
+                # only main process gets accumulated, so only divide by
+                # world_size in this case
+                all_losses /= world_size
+            reduced_losses = {k: v for k, v in zip(loss_names, all_losses)}
+            
+        return total_loss#reduced_losses
 
     def _valid_epoch(self, epoch):
         self.logger.info('\n###### EVALUATION ######')
 
-        self.model.eval()
+        self.model.module.eval()
         self.writer_mode = 'val'
 
         self._reset_metrics()
@@ -233,7 +303,7 @@ class BaseTrainer:
                     val_visual.append([images[0].data.cpu(), target_np[0], output_np[0]])
 
                 # PRINT INFO
-                pixAcc, mIoU, _ = self._get_seg_metrics().values()
+                pixAcc, mIoU = self._get_seg_metrics().values()
                 tbar.set_description('EVAL ({}) | Loss: {:.3f}, PixelAcc: {:.2f}, Mean IoU: {:.2f} |'.format( epoch,
                                                 self.total_loss.average,
                                                 pixAcc, mIoU))
@@ -284,6 +354,5 @@ class BaseTrainer:
         mIoU = np.mean(IoU)
         return {
             "Pixel_Accuracy": np.round(pixAcc, 3),
-            "Mean_IoU": mIoU,
-            "Class_IoU": dict(zip(range(self.num_classes), np.round(IoU, 3)))
+            "Mean_IoU": mIoU
         }

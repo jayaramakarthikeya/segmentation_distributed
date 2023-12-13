@@ -5,19 +5,23 @@ from torchvision import models
 from model.base_model import BaseModel
 from utils.helpers import initialize_weights
 from itertools import chain
+from syncbn.nn import SyncBatchNorm, DistSyncBatchNorm
+
+#norm_layer = nn.BatchNorm2d
 
 class PSPModule(nn.Module):
     # In the original inmplementation they use precise RoI pooling 
     # Instead of using adaptative average pooling
-    def __init__(self, in_channels, bin_sizes=[1, 2, 4, 6]):
+    def __init__(self, in_channels, bin_sizes=[1, 2, 4, 6], norm_layer = nn.BatchNorm2d):
         super(PSPModule, self).__init__()
         out_channels = in_channels // len(bin_sizes)
         self.stages = nn.ModuleList([self._make_stages(in_channels, out_channels, b_s) 
                                                         for b_s in bin_sizes])
+        self.norm_layer = norm_layer
         self.bottleneck = nn.Sequential(
             nn.Conv2d(in_channels+(out_channels * len(bin_sizes)), in_channels, 
                                     kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(in_channels),
+            norm_layer(in_channels),
             nn.ReLU(inplace=True),
             nn.Dropout2d(0.1)
         )
@@ -25,7 +29,7 @@ class PSPModule(nn.Module):
     def _make_stages(self, in_channels, out_channels, bin_sz):
         prior = nn.AdaptiveAvgPool2d(output_size=bin_sz)
         conv = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
-        bn = nn.BatchNorm2d(out_channels)
+        bn = self.norm_layer(out_channels)
         relu = nn.ReLU(inplace=True)
         return nn.Sequential(prior, conv, bn, relu)
     
@@ -38,13 +42,14 @@ class PSPModule(nn.Module):
         return output
 
 class ResNet(nn.Module):
-    def __init__(self, in_channels=3, output_stride=16, backbone='resnet101', pretrained=True):
+    def __init__(self, in_channels=3, output_stride=16, backbone='resnet101', norm_layer = nn.BatchNorm2d, pretrained=True):
         super(ResNet, self).__init__()
         model = getattr(models, backbone)(pretrained)
+        self.norm_layer = norm_layer
         if not pretrained or in_channels != 3:
             self.initial = nn.Sequential(
                 nn.Conv2d(in_channels, 64, 7, stride=2, padding=3, bias=False),
-                nn.BatchNorm2d(64),
+                self.norm_layer(64),
                 nn.ReLU(inplace=True),
                 nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
             )
@@ -90,7 +95,7 @@ def up_and_add(x, y):
     return F.interpolate(x, size=(y.size(2), y.size(3)), mode='bilinear', align_corners=True) + y
 
 class FPN_fuse(nn.Module):
-    def __init__(self, feature_channels=[256, 512, 1024, 2048], fpn_out=256):
+    def __init__(self, feature_channels=[256, 512, 1024, 2048], fpn_out=256, norm_layer = nn.BatchNorm2d):
         super(FPN_fuse, self).__init__()
         assert feature_channels[0] == fpn_out
         self.conv1x1 = nn.ModuleList([nn.Conv2d(ft_size, fpn_out, kernel_size=1)
@@ -99,7 +104,7 @@ class FPN_fuse(nn.Module):
                                     * (len(feature_channels)-1))
         self.conv_fusion = nn.Sequential(
             nn.Conv2d(len(feature_channels)*fpn_out, fpn_out, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(fpn_out),
+            norm_layer(fpn_out),
             nn.ReLU(inplace=True)
         )
 
@@ -118,16 +123,26 @@ class FPN_fuse(nn.Module):
 
 class UperNet(BaseModel):
     # Implementing only the object path
-    def __init__(self, num_classes, in_channels=3, backbone='resnet101', pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False, **_):
+    def __init__(self, num_classes, in_channels=3, backbone='resnet101', parallel_type = None, pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False, **_):
         super(UperNet, self).__init__()
         self.model_type = "UperNet"
         if backbone == 'resnet34' or backbone == 'resnet18':
             feature_channels = [64, 128, 256, 512]
         else:
             feature_channels = [256, 512, 1024, 2048]
-        self.backbone = ResNet(in_channels, pretrained=pretrained)
-        self.PPN = PSPModule(feature_channels[-1])
-        self.FPN = FPN_fuse(feature_channels, fpn_out=fpn_out)
+        
+        self.parallel_type = parallel_type
+        
+        if parallel_type == 'dp':
+            self.norm_layer = SyncBatchNorm
+        elif parallel_type == 'ddp':
+            self.norm_layer = DistSyncBatchNorm
+        else:
+            self.norm_layer = nn.BatchNorm2d
+
+        self.backbone = ResNet(in_channels, pretrained=pretrained, norm_layer=self.norm_layer)
+        self.PPN = PSPModule(feature_channels[-1], norm_layer=self.norm_layer)
+        self.FPN = FPN_fuse(feature_channels, fpn_out=fpn_out, norm_layer=self.norm_layer)
         self.head = nn.Conv2d(fpn_out, num_classes, kernel_size=3, padding=1)
         if freeze_bn: self.freeze_bn()
 
@@ -149,5 +164,5 @@ class UperNet(BaseModel):
 
     def freeze_bn(self):
         for module in self.modules():
-            if isinstance(module, nn.BatchNorm2d): module.eval()
+            if isinstance(module, self.norm_layer): module.eval()
 
