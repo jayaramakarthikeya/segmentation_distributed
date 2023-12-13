@@ -24,6 +24,7 @@ from utils.helpers import initialize_weights
 from glob import glob
 from trainer.ddp_trainer import DDPTrainer
 from trainer.dp_trainer import DPTrainer
+import torch.multiprocessing as mp
 
 #params
 data_dir = '..'
@@ -35,11 +36,12 @@ augment = True
 
 num_epochs = 80
 
-def main(args, config):
+def main(rank, args, config, world_size = 1):
 
     torch.autograd.set_detect_anomaly(True)
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
-                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8)
+                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8,
+                                  parallel_type = args.parallel)
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4)
@@ -67,11 +69,11 @@ def main(args, config):
     if args.parallel == 'dp':
         print("USING DATA PARALLEL")
         gpu_trainer = DPTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=None, parallel_type='dp')
+                            val_loader=val_dataloader,start_epoch=None, parallel_type=args.parallel)
     
     elif args.parallel == 'ddp':
         gpu_trainer = DDPTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=None, parallel_type='ddp')
+                            val_loader=val_dataloader,start_epoch=None, parallel_type=args.parallel, rank = rank, world_size=world_size)
 
     else:
     
@@ -104,4 +106,10 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
     
-    main(args, config)
+    if args.parallel is not 'ddp':
+        main(args, config, rank = 0)
+    else:
+        world_size = torch.cuda.device_count()
+        mp.spawn(main, args=(args, config, world_size), nprocs=world_size)
+
+
