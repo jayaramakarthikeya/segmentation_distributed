@@ -4,12 +4,20 @@ import torch.nn as nn
 import numpy as np
 import math
 import PIL
+import torch.distributed as dist
 
 def dir_exists(path):
     if not os.path.exists(path):
             os.makedirs(path)
 
 
+def setup(rank, world_size, localhost='localhost', master_port='12355'):
+    os.environ['MASTER_ADDR'] =  localhost
+    os.environ['MASTER_PORT'] =  master_port
+    dist.init_process_group(backend="nccl", rank=rank, world_size=world_size)
+
+def cleanup():
+    dist.destroy_process_group()
 
 def initialize_weights(*models):
     for model in models:

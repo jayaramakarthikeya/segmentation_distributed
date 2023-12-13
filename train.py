@@ -20,7 +20,7 @@ from model.unet import UNet
 from model.deeplabv3 import DeepLab
 from model.upernet import UperNet
 from model.hrnet import HighResolutionNet
-from utils.helpers import initialize_weights
+from utils.helpers import initialize_weights, setup, cleanup
 from glob import glob
 from trainer.ddp_trainer import DDPTrainer
 from trainer.dp_trainer import DPTrainer
@@ -39,6 +39,9 @@ num_epochs = 80
 def main(rank, args, config, world_size = 1):
 
     torch.autograd.set_detect_anomaly(True)
+
+    setup(rank=rank, world_size=world_size)
+
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
                                   crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8,
                                   parallel_type = args.parallel)
@@ -84,7 +87,7 @@ def main(rank, args, config, world_size = 1):
     gpu_trainer.train()
 
     if config.parallel == 'ddp':
-        gpu_trainer.cleanup()
+        cleanup()
    
     
 
