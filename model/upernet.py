@@ -19,7 +19,7 @@ class PSPModule(nn.Module):
         self.stages = nn.ModuleList([self._make_stages(in_channels, out_channels, b_s) 
                                                         for b_s in bin_sizes])
         
-        print("reijfiefjei@@@@",str(self.norm_layer))
+        #print("reijfiefjei@@@@",str(self.norm_layer))
         self.bottleneck = nn.Sequential(
             nn.Conv2d(in_channels+(out_channels * len(bin_sizes)), in_channels, 
                                     kernel_size=3, padding=1, bias=False),

@@ -108,7 +108,8 @@ class BaseTrainer:
         return device, available_gpus
 
     def train(self):
-
+        init_start_event = torch.cuda.Event(enable_timing=True)
+        init_end_event = torch.cuda.Event(enable_timing=True)
         #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
@@ -125,7 +126,8 @@ class BaseTrainer:
                 self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
                 self.logger.warning('Training Stopped')
                 break
-
+        
+        init_end_event.record()
 
         
 
