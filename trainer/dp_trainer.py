@@ -18,7 +18,7 @@ class DPTrainer(BaseTrainer):
         print(f"Available GPUs: {dev_count}")
         self.model = nn.DataParallel(model, device_ids=list(range(dev_count))) 
         #self.model.to(self.device)
-        self.model.to('cuda:0')
+        self.model.to(self.device)
         self.train_loader = train_loader
         
         self.parallel_type = parallel_type

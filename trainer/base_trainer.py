@@ -191,6 +191,7 @@ class BaseTrainer:
 
                 #print("LOSS BACKWARD#######")
                 loss.backward()
+                self.optimizer.step()
                 self.total_loss.update(loss.item())
 
 
@@ -270,7 +271,7 @@ class BaseTrainer:
     def _valid_epoch(self, epoch):
         self.logger.info('\n###### EVALUATION ######')
 
-        self.model.module.eval()
+        self.model.eval()
         self.writer_mode = 'val'
 
         self._reset_metrics()
@@ -281,14 +282,19 @@ class BaseTrainer:
                 if len(self.available_gpus) >= 1 and self.n_gpu == 1:
                     images , labels = images.to(self.device) , labels.to(self.device)
                 # LOSS
-                try:
-                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
-                    
-                        output = self.model(images)
-                        loss = self.loss(output, labels)
-                        self.total_loss.update(loss.item())
-                except RuntimeError:
-                    continue
+                if self.parallel_type is not None:
+                    output = self.model(images)
+                    loss = self.loss(output, labels)
+                    self.total_loss.update(loss.item())
+                else:
+                    try:
+                        with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                        
+                            output = self.model(images)
+                            loss = self.loss(output, labels)
+                            self.total_loss.update(loss.item())
+                    except RuntimeError:
+                        continue
 
                 seg_metrics = eval_metrics(output, labels, self.num_classes)
                 self._update_seg_metrics(*seg_metrics)

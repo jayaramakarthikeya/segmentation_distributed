@@ -15,13 +15,15 @@ class PSPModule(nn.Module):
     def __init__(self, in_channels, bin_sizes=[1, 2, 4, 6], norm_layer = nn.BatchNorm2d):
         super(PSPModule, self).__init__()
         out_channels = in_channels // len(bin_sizes)
+        self.norm_layer = norm_layer
         self.stages = nn.ModuleList([self._make_stages(in_channels, out_channels, b_s) 
                                                         for b_s in bin_sizes])
-        self.norm_layer = norm_layer
+        
+        print("reijfiefjei@@@@",str(self.norm_layer))
         self.bottleneck = nn.Sequential(
             nn.Conv2d(in_channels+(out_channels * len(bin_sizes)), in_channels, 
                                     kernel_size=3, padding=1, bias=False),
-            norm_layer(in_channels),
+            self.norm_layer(in_channels),
             nn.ReLU(inplace=True),
             nn.Dropout2d(0.1)
         )
@@ -123,7 +125,7 @@ class FPN_fuse(nn.Module):
 
 class UperNet(BaseModel):
     # Implementing only the object path
-    def __init__(self, num_classes, in_channels=3, backbone='resnet101', parallel_type = None, pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False, **_):
+    def __init__(self, num_classes, in_channels=3, backbone='resnet101', parallel_type = None, pretrained=True, use_aux=True, fpn_out=256, freeze_bn=False):
         super(UperNet, self).__init__()
         self.model_type = "UperNet"
         if backbone == 'resnet34' or backbone == 'resnet18':
@@ -132,13 +134,13 @@ class UperNet(BaseModel):
             feature_channels = [256, 512, 1024, 2048]
         
         self.parallel_type = parallel_type
-        
+        self.norm_layer = nn.BatchNorm2d
         if parallel_type == 'dp':
             self.norm_layer = SyncBatchNorm
         elif parallel_type == 'ddp':
             self.norm_layer = DistSyncBatchNorm
-        else:
-            self.norm_layer = nn.BatchNorm2d
+
+        #print("&**********************************",parallel_type)
 
         self.backbone = ResNet(in_channels, pretrained=pretrained, norm_layer=self.norm_layer)
         self.PPN = PSPModule(feature_channels[-1], norm_layer=self.norm_layer)
