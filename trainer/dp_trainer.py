@@ -10,6 +10,7 @@ class DPTrainer(BaseTrainer):
         self.config = config
         self.train_loader = train_loader
         self.n_gpu = self.config['n_gpu']
+        #print(model.module.model_type)
 
         self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
         

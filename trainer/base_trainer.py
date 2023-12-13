@@ -32,9 +32,11 @@ class BaseTrainer:
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
-        self.model_type = "PSPnet"#self.model.model_type
-        
         self.parallel_type = parallel_type
+        if self.parallel_type is not None:
+            self.model_type = self.model.module.model_type
+        
+        
         
         self.loss = getattr(losses, config['loss'])(ignore_index=config['ignore_index'])
 
@@ -69,17 +71,17 @@ class BaseTrainer:
 
         #CHECKPOINTS & TENSOBOARD
         start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
-        self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.config['name'], start_time)
+        self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.model_type, start_time)
         helpers.dir_exists(self.checkpoint_dir)
         config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
         with open(config_save_path, 'w') as handle:
             json.dump(self.config, handle, indent=4, sort_keys=True)
 
-        writer_dir = os.path.join(cfg_trainer['log_dir'], self.config['name'], start_time)
+        writer_dir = os.path.join(cfg_trainer['log_dir'], self.model_type, start_time)
         self.writer = tensorboard.SummaryWriter(writer_dir)
 
         #Early Stopping
-        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode)
+        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode,self.parallel_type)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
@@ -104,7 +106,6 @@ class BaseTrainer:
         self.logger.info(f'Detected GPUs: {sys_gpu} Requested: {n_gpu}')
         available_gpus = list(range(n_gpu))
         return device, available_gpus
-    
 
     def train(self):
 
@@ -143,58 +144,54 @@ class BaseTrainer:
             self.data_time.update(time.time() - tic)
             
 
-            #if self.parallel_type == None:
-                #print("Parallel type None)))))))") 
+            if self.parallel_type == None:
 
-            try:
-                with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                try:
+                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
-                    #FORWARD PASS
-                    self.optimizer.zero_grad()
-                    output = self.model(images)
+                        #FORWARD PASS
+                        self.optimizer.zero_grad()
+                        output = self.model(images)
 
-                    #BACKWARD PASS AND OPTIMIZE
-                    if self.model_type[:3] == "PSP":
-                        assert output[0].size()[2:] == labels.size()[1:]
-                        assert output[0].size()[1] == self.num_classes 
-                        loss = self.loss(output[0], labels)
-                        loss += self.loss(output[1], labels) * 0.4
-                        output = output[0]
-                    else:
-                        assert output.size()[2:] == labels.size()[1:]
-                        assert output.size()[1] == self.num_classes 
-                        loss = self.loss(output, labels)
+                        #BACKWARD PASS AND OPTIMIZE
+                        if self.model_type[:3] == "PSP":
+                            assert output[0].size()[2:] == labels.size()[1:]
+                            assert output[0].size()[1] == self.num_classes 
+                            loss = self.loss(output[0], labels)
+                            loss += self.loss(output[1], labels) * 0.4
+                            output = output[0]
+                        else:
+                            assert output.size()[2:] == labels.size()[1:]
+                            assert output.size()[1] == self.num_classes 
+                            loss = self.loss(output, labels)
+
+                            
+                        self.scaler.scale(loss).backward()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        self.total_loss.update(loss.item())
+
+                except RuntimeError:
+                    continue
 
                     
-                    self.scaler.scale(loss).backward()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.total_loss.update(loss.item())
+            else:
+                self.optimizer.zero_grad()
+                output = self.model(images)
+                if self.model_type[:3] == "PSP":
+                    assert output[0].size()[2:] == labels.size()[1:]
+                    assert output[0].size()[1] == self.num_classes 
+                    loss = self.loss(output[0], labels)
+                    loss += self.loss(output[1], labels) * 0.4
+                    output = output[0]
+                else:
+                    assert output.size()[2:] == labels.size()[1:]
+                    assert output.size()[1] == self.num_classes 
+                    loss = self.loss(output, labels)
 
-            except RuntimeError:
-                continue
-
-                    
-            # else:
-            #     self.optimizer.zero_grad()
-            #     output = self.model(images)
-            #     #print("************in DP train loop")
-            #     if self.model.module.model_type[:3] == "PSP":
-            #         assert output[0].size()[2:] == labels.size()[1:]
-            #         assert output[0].size()[1] == self.num_classes 
-            #         loss = self.loss(output[0], labels)
-            #         loss += self.loss(output[1], labels) * 0.4
-            #         output = output[0]
-            #     else:
-            #         assert output.size()[2:] == labels.size()[1:]
-            #         assert output.size()[1] == self.num_classes 
-            #         loss = self.loss(output, labels)
-
-            #     #print("LOSS BACKWARD#######")
-            #     loss.backward()
-            #     self.optimizer.step()
-            #     #print("********",loss.item().dtype)
-            #     self.total_loss.update(loss.item())
+                #print("LOSS BACKWARD#######")
+                loss.backward()
+                self.total_loss.update(loss.item())
 
 
             

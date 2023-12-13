@@ -32,7 +32,7 @@
     },
 
     "trainer": {
-        "epochs": 30,
+        "epochs": 15,
         "save_dir": "saved/",
         "save_period": 10,
         "tensorboard_log_step": 1,

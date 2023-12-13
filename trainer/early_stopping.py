@@ -4,7 +4,7 @@ import os
 
 class EarlyStopping:
     """Early stops the training if validation score doesn't improve after a given patience."""
-    def __init__(self, model, model_type,optimizer, config, checkpoint_dir, mnt_mode = 'max', patience=7, verbose=False, delta=0, trace_func=print):
+    def __init__(self, model, model_type,optimizer, config, checkpoint_dir, mnt_mode = 'max', patience=7, verbose=False, delta=0, trace_func=print,parallel_type=None):
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
@@ -17,6 +17,7 @@ class EarlyStopping:
         self.model_type = model_type
         self.config = config
         self.optimizer = optimizer
+        self.parallel_type = parallel_type
     
         self.trace_func = trace_func
     def __call__(self, score, epoch, model):
@@ -39,14 +40,24 @@ class EarlyStopping:
         '''Saves model when validation metric decrease.'''
         if self.verbose:
             self.trace_func(f'Metric improved ({self.best_score:.6f} --> {score:.6f}).  Saving model ...')
-        state = {
-            'arch': self.model.model_type,
+        if self.parallel_type is not None:
+            state = {
+            'arch': self.model_type,
             'epoch': epoch,
-            'state_dict': self.model.state_dict(),
+            'state_dict': self.model.module.state_dict(),
             'optimizer': self.optimizer.state_dict(),
             'best_score': self.best_score,
             'config': self.config
         }
+        else:
+            state = {
+                'arch': self.model_type,
+                'epoch': epoch,
+                'state_dict': self.model.state_dict(),
+                'optimizer': self.optimizer.state_dict(),
+                'best_score': self.best_score,
+                'config': self.config
+            }
         previous_checkpoint_pth = os.path.join(self.checkpoint_dir,f"checkpoint-epoch{epoch-1}.pth")
         if os.path.exists(previous_checkpoint_pth):
             os.remove(previous_checkpoint_pth)
