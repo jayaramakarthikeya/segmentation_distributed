@@ -86,7 +86,7 @@ def main(rank, args, config, world_size = 1):
     print("TRAINING")
     gpu_trainer.train()
 
-    if config.parallel == 'ddp':
+    if args.parallel == 'ddp':
         cleanup()
    
     

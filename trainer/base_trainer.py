@@ -119,18 +119,18 @@ class BaseTrainer:
             results = self._train_epoch(epoch)
             if self.device == 0:
                 self.early_stoping(results[self.mnt_metric],epoch,self.model)
-            if self.device ==0 and epoch % self.config['trainer']['val_per_epochs'] == 0:
-                results = self._valid_epoch(epoch)
+                if epoch % self.config['trainer']['val_per_epochs'] == 0:
+                    results = self._valid_epoch(epoch)
 
-            self.logger.info(f"Results for {epoch} epoch: ")
-            for k , v in results.items():
-                self.logger.info(f" {str(k)}: {v}")
-            
+                    self.logger.info(f"Results for {epoch} epoch: ")
+                    for k , v in results.items():
+                        self.logger.info(f" {str(k)}: {v}")
+                
 
-            if self.early_stoping.early_stop:
-                self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
-                self.logger.warning('Training Stopped')
-                break
+                if self.early_stoping.early_stop:
+                    self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
+                    self.logger.warning('Training Stopped')
+                    break
         
         init_end_event.record()
 
@@ -202,7 +202,8 @@ class BaseTrainer:
                 #print("LOSS BACKWARD#######")
                 loss.backward()
                 self.optimizer.step()
-                self.total_loss.update(loss.item())
+                if self.device == 0:
+                    self.total_loss.update(loss.item())
 
 
             
@@ -215,28 +216,29 @@ class BaseTrainer:
                     self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
                     self.writer.add_scalar(f'{self.writer_mode}/loss', loss.item(), self.wrt_step)
 
-            # FOR EVAL
-            seg_metrics = eval_metrics(output, labels, self.num_classes)
-            self._update_seg_metrics(*seg_metrics)
-            pixAcc, mIoU = self._get_seg_metrics().values()
+                # FOR EVAL
+                seg_metrics = eval_metrics(output, labels, self.num_classes)
+                self._update_seg_metrics(*seg_metrics)
+                pixAcc, mIoU = self._get_seg_metrics().values()
 
 
-            # PRINT INFO
-            tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
-                                                epoch, self.total_loss.average, 
-                                                pixAcc, mIoU,
-                                                self.batch_time.average, self.data_time.average))
+                # PRINT INFO
+                tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
+                                                    epoch, self.total_loss.average, 
+                                                    pixAcc, mIoU,
+                                                    self.batch_time.average, self.data_time.average))
 
-        if self.device == 0:
-            # METRICS TO TENSORBOARD
-            seg_metrics = self._get_seg_metrics()
-            for k, v in list(seg_metrics.items())[:-1]: 
-                self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
-            for i, opt_group in enumerate(self.optimizer.param_groups):
-                self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
+                # METRICS TO TENSORBOARD
+                seg_metrics = self._get_seg_metrics()
+                for k, v in list(seg_metrics.items())[:-1]: 
+                    self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
+                for i, opt_group in enumerate(self.optimizer.param_groups):
+                    self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
 
+        log = {}
         # RETURN LOSS & METRICS
-        log = {'loss': self.total_loss.average,
+        if self.device == 0:
+            log = {'loss': self.total_loss.average,
                 **seg_metrics}
         
         if self.lr_sheduler is not None:
@@ -344,7 +346,7 @@ class BaseTrainer:
             seg_metrics = self._get_seg_metrics()
             for k, v in list(seg_metrics.items())[:-1]: 
                 self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
-
+            print(self.total_loss)
             log = {
                 'val_loss': self.total_loss.average,
                 **seg_metrics
