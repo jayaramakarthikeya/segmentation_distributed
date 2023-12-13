@@ -152,7 +152,7 @@ class BaseTrainer:
                     #FORWARD PASS
                     self.optimizer.zero_grad()
                     output = self.model(images)
-                    print("heufheuf^^^^^^^")
+                    print("*********************")
                     #BACKWARD PASS AND OPTIMIZE
                     if self.model_type[:3] == "PSP":
                         assert output[0].size()[2:] == labels.size()[1:]
