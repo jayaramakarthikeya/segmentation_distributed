@@ -12,7 +12,8 @@ import socket
 
 
 class DDPTrainer(BaseTrainer):
-    def __init__(self, config, model, train_loader, val_loader,start_epoch, rank = None, localhost='localhost', master_port='12355'):
+    def __init__(self, config, model, train_loader, val_loader,start_epoch, world_size = None, 
+                 rank = None, localhost='localhost', master_port='12355'):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.train_loader = train_loader
@@ -21,9 +22,12 @@ class DDPTrainer(BaseTrainer):
         #rank, world_size = self.get_rank_world_size()
 
         self.setup(rank, world_size)
-        self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
+        #self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
+        self.device = rank
 
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model).to(rank)
+
+        self.model = model.to(self.device)
 
         self.model = DDP(model, device_ids=[self.device])
 
@@ -32,7 +36,8 @@ class DDPTrainer(BaseTrainer):
         self.train_loader = train_loader
 
         self.num_classes = self.train_loader.dataset.num_classes
-        super(DDPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,self.n_gpu,self.available_gpus,start_epoch)
+        super(DDPTrainer,self).__init__(config, self.model, self.train_loader, val_loader, self.logger,self.device,
+                                        self.n_gpu,self.available_gpus,start_epoch)
 
     def setup(rank, world_size, localhost='localhost', master_port='12355'):
         os.environ['MASTER_ADDR'] =  localhost

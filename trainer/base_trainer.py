@@ -21,9 +21,11 @@ from torchvision import transforms
 import torch.distributed as dist
 
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch, parallel_type=None):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,
+                 available_gpus,start_epoch, parallel_type=None):
         self.logger = logger
         self.train_loader = train_loader
+        
         self.config = config
         self.device = device
         self.n_gpu = n_gpu
@@ -81,7 +83,8 @@ class BaseTrainer:
         self.writer = tensorboard.SummaryWriter(writer_dir)
 
         #Early Stopping
-        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode,self.parallel_type)
+        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,
+                                           self.checkpoint_dir,self.mnt_mode,self.parallel_type, device = self.device)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
@@ -108,7 +111,7 @@ class BaseTrainer:
         return device, available_gpus
 
     def train(self):
-
+        
         #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)

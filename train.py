@@ -36,11 +36,12 @@ augment = True
 
 num_epochs = 80
 
-def main(args, config, rank = 0,  world_size = 1):
+def main(rank, args, config, world_size = 1):
 
     torch.autograd.set_detect_anomaly(True)
     train_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='training',\
-                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8)
+                                  crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=8,
+                                  parallel_type = args.parallel)
     
     val_dataloader = ADE20KDataLoader(data_dir=data_dir,batch_size=batch_size,split='validation',
                                       crop_size=crop_size,base_size=base_size,scale=scale,augment=augment,num_workers=4)
@@ -72,7 +73,7 @@ def main(args, config, rank = 0,  world_size = 1):
     
     elif args.parallel == 'ddp':
         gpu_trainer = DDPTrainer(config=config, model=model, train_loader=train_dataloader,
-                            val_loader=val_dataloader,start_epoch=None, parallel_type=args.parallel, world_size=world_size)
+                            val_loader=val_dataloader,start_epoch=None, parallel_type=args.parallel, rank = rank, world_size=world_size)
 
     else:
     
@@ -106,7 +107,7 @@ if __name__ == '__main__':
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
     
     if args.parallel is not 'ddp':
-        main(args, config)
+        main(args, config, rank = 0)
     else:
         world_size = torch.cuda.device_count()
         mp.spawn(main, args=(args, config, world_size), nprocs=world_size)
