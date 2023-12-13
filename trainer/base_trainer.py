@@ -146,32 +146,32 @@ class BaseTrainer:
             #if self.parallel_type == None:
                 #print("Parallel type None)))))))") 
 
-            try:
-                with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
-                    #print("heufheuf@@@@")
-                    #FORWARD PASS
-                    self.optimizer.zero_grad()
-                    output = self.model(images)
-                    #BACKWARD PASS AND OPTIMIZE
-                    if self.model_type[:3] == "PSP":
-                        assert output[0].size()[2:] == labels.size()[1:]
-                        assert output[0].size()[1] == self.num_classes 
-                        loss = self.loss(output[0], labels)
-                        loss += self.loss(output[1], labels) * 0.4
-                        output = output[0]
-                    else:
-                        assert output.size()[2:] == labels.size()[1:]
-                        assert output.size()[1] == self.num_classes 
-                        loss = self.loss(output, labels)
+            #try:
+            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                #print("heufheuf@@@@")
+                #FORWARD PASS
+                self.optimizer.zero_grad()
+                output = self.model(images)
+                #BACKWARD PASS AND OPTIMIZE
+                if self.model_type[:3] == "PSP":
+                    assert output[0].size()[2:] == labels.size()[1:]
+                    assert output[0].size()[1] == self.num_classes 
+                    loss = self.loss(output[0], labels)
+                    loss += self.loss(output[1], labels) * 0.4
+                    output = output[0]
+                else:
+                    assert output.size()[2:] == labels.size()[1:]
+                    assert output.size()[1] == self.num_classes 
+                    loss = self.loss(output, labels)
 
-                    
-                    self.scaler.scale(loss).backward()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.total_loss.update(loss.item())
+                
+                self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.total_loss.update(loss.item())
 
-            except RuntimeError:
-                continue
+            #except RuntimeError:
+            #    continue
 
                     
             #else:
