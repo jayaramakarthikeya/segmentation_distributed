@@ -71,20 +71,21 @@ class BaseTrainer:
             self.mnt_mode, self.mnt_metric = self.monitor.split()
             assert self.mnt_mode in ['min', 'max']
 
+        if self.device == 0:
         #CHECKPOINTS & TENSOBOARD
-        start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
-        self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.model_type, start_time)
-        helpers.dir_exists(self.checkpoint_dir)
-        config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
-        with open(config_save_path, 'w') as handle:
-            json.dump(self.config, handle, indent=4, sort_keys=True)
+            start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
+            self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.model_type, start_time)
+            helpers.dir_exists(self.checkpoint_dir)
+            config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
+            with open(config_save_path, 'w') as handle:
+                json.dump(self.config, handle, indent=4, sort_keys=True)
 
-        writer_dir = os.path.join(cfg_trainer['log_dir'], self.model_type, start_time)
-        self.writer = tensorboard.SummaryWriter(writer_dir)
+            writer_dir = os.path.join(cfg_trainer['log_dir'], self.model_type, start_time)
+            self.writer = tensorboard.SummaryWriter(writer_dir)
 
-        #Early Stopping
-        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,
-                                           self.checkpoint_dir,self.mnt_mode,self.parallel_type, device = self.device)
+            #Early Stopping
+            self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,
+                                            self.checkpoint_dir,self.mnt_mode,self.parallel_type, device = self.device)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
@@ -116,8 +117,9 @@ class BaseTrainer:
         #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
-            self.early_stoping(results[self.mnt_metric],epoch,self.model)
-            if epoch % self.config['trainer']['val_per_epochs'] == 0:
+            if self.device == 0:
+                self.early_stoping(results[self.mnt_metric],epoch,self.model)
+            if self.device ==0 and epoch % self.config['trainer']['val_per_epochs'] == 0:
                 results = self._valid_epoch(epoch)
 
             self.logger.info(f"Results for {epoch} epoch: ")
@@ -144,7 +146,10 @@ class BaseTrainer:
         #print("In train epoch&&&&&")
 
         for batch_idx , (images,labels) in enumerate(tbar):
-            if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+            if self.parallel_type != "ddp":
+                if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                    images , labels = images.to(self.device) , labels.to(self.device)
+            else:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             
@@ -204,11 +209,11 @@ class BaseTrainer:
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
             tic = time.time()
-
-            # LOGGING & TENSORBOARD
-            if batch_idx % self.log_step == 0:
-                self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
-                self.writer.add_scalar(f'{self.writer_mode}/loss', loss.item(), self.wrt_step)
+            if self.device ==0:
+                # LOGGING & TENSORBOARD
+                if batch_idx % self.log_step == 0:
+                    self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
+                    self.writer.add_scalar(f'{self.writer_mode}/loss', loss.item(), self.wrt_step)
 
             # FOR EVAL
             seg_metrics = eval_metrics(output, labels, self.num_classes)
@@ -222,12 +227,13 @@ class BaseTrainer:
                                                 pixAcc, mIoU,
                                                 self.batch_time.average, self.data_time.average))
 
-        # METRICS TO TENSORBOARD
-        seg_metrics = self._get_seg_metrics()
-        for k, v in list(seg_metrics.items())[:-1]: 
-            self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
-        for i, opt_group in enumerate(self.optimizer.param_groups):
-            self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
+        if self.device == 0:
+            # METRICS TO TENSORBOARD
+            seg_metrics = self._get_seg_metrics()
+            for k, v in list(seg_metrics.items())[:-1]: 
+                self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
+            for i, opt_group in enumerate(self.optimizer.param_groups):
+                self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
 
         # RETURN LOSS & METRICS
         log = {'loss': self.total_loss.average,
@@ -284,7 +290,10 @@ class BaseTrainer:
         with torch.no_grad():
             val_visual = []
             for batch_idx, (images,labels) in enumerate(tbar):
-                if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                if self.parallel_type != "ddp":
+                    if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                        images , labels = images.to(self.device) , labels.to(self.device)
+                else:
                     images , labels = images.to(self.device) , labels.to(self.device)
                 # LOSS
                 if self.parallel_type is not None:

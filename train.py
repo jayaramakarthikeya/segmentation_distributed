@@ -28,7 +28,7 @@ import torch.multiprocessing as mp
 
 #params
 data_dir = '..'
-batch_size = 32
+batch_size = 16
 crop_size = 380
 base_size = 400
 scale = True

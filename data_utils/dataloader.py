@@ -60,7 +60,7 @@ class ADE20KDataLoader(DataLoader):
                 'pin_memory': True
             }
 
-        super(ADE20KDataLoader, self).__init__(sampler=self.train_sampler, **self.dataloader_kwargs)
+        super(ADE20KDataLoader, self).__init__(**self.dataloader_kwargs)
 
     def _split_sampler(self, split):
         if split == 0.0:
