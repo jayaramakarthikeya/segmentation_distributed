@@ -146,35 +146,35 @@ class BaseTrainer:
             #if self.parallel_type == None:
                 #print("Parallel type None)))))))") 
 
-            try:
-                with torch.autocast(device_type = self.device, dtype=torch.float16,enabled=False):
-                    #print("heufheuf@@@@")
-                    #FORWARD PASS
-                    self.optimizer.zero_grad()
-                    output = self.model(images)
-                    print("*********************")
-                    #BACKWARD PASS AND OPTIMIZE
-                    if self.model_type[:3] == "PSP":
-                        assert output[0].size()[2:] == labels.size()[1:]
-                        assert output[0].size()[1] == self.num_classes 
-                        loss = self.loss(output[0], labels)
-                        loss += self.loss(output[1], labels) * 0.4
-                        output = output[0]
-                        print(loss.item())
-                    else:
-                        assert output.size()[2:] == labels.size()[1:]
-                        assert output.size()[1] == self.num_classes 
-                        loss = self.loss(output, labels)
-
-                    
-                    self.scaler.scale(loss).backward()
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.total_loss.update(loss.item())
+            #try:
+            with torch.autocast(device_type = self.device, dtype=torch.float16,enabled=False):
+                #print("heufheuf@@@@")
+                #FORWARD PASS
+                self.optimizer.zero_grad()
+                output = self.model(images)
+                print("*********************")
+                #BACKWARD PASS AND OPTIMIZE
+                if self.model_type[:3] == "PSP":
+                    assert output[0].size()[2:] == labels.size()[1:]
+                    assert output[0].size()[1] == self.num_classes 
+                    loss = self.loss(output[0], labels)
+                    loss += self.loss(output[1], labels) * 0.4
+                    output = output[0]
                     print(loss.item())
+                else:
+                    assert output.size()[2:] == labels.size()[1:]
+                    assert output.size()[1] == self.num_classes 
+                    loss = self.loss(output, labels)
 
-            except RuntimeError:
-                continue
+                
+                self.scaler.scale(loss).backward()
+                self.scaler.step(self.optimizer)
+                self.scaler.update()
+                self.total_loss.update(loss.item())
+                print(loss.item())
+
+            """ except RuntimeError:
+                continue """
 
                     
             #else:
