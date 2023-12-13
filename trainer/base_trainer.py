@@ -148,7 +148,7 @@ class BaseTrainer:
 
             try:
                 with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
-
+                    print("heufheuf@@@@")
                     #FORWARD PASS
                     self.optimizer.zero_grad()
                     output = self.model(images)
