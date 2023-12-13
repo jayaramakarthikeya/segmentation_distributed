@@ -170,6 +170,7 @@ class BaseTrainer:
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
                     self.total_loss.update(loss.item())
+                    print(loss.item())
 
             except RuntimeError:
                 continue
