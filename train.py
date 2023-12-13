@@ -106,8 +106,8 @@ if __name__ == '__main__':
     if args.device:
         os.environ["CUDA_VISIBLE_DEVICES"] = args.device
     
-    if args.parallel is not 'ddp':
-        main(args, config, rank = 0)
+    if args.parallel != 'ddp':
+        main(0,args, config)
     else:
         world_size = torch.cuda.device_count()
         mp.spawn(main, args=(args, config, world_size), nprocs=world_size)
