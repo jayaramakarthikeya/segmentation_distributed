@@ -147,7 +147,7 @@ class BaseTrainer:
                 #print("Parallel type None)))))))") 
 
             #try:
-            with torch.autocast(device_type = self.device, dtype=torch.float16,enabled=False):
+            with torch.autocast(device_type = 'cuda', dtype=torch.float16,enabled=False):
                 #print("heufheuf@@@@")
                 #FORWARD PASS
                 self.optimizer.zero_grad()
