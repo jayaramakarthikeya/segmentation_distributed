@@ -87,7 +87,7 @@ class BaseTrainer:
 
             #Early Stopping
             self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,
-                                            self.checkpoint_dir,self.mnt_mode,self.parallel_type, device = self.device)
+                                            self.checkpoint_dir,self.mnt_mode,patience=int(cfg_trainer['early_stop']),parallel_type=self.parallel_type, device = self.device)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
