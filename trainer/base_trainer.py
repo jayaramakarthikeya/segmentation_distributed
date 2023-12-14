@@ -159,7 +159,7 @@ class BaseTrainer:
             
             if self.parallel_type == None:
 
-                #try:
+                try:
                     with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
                     
                         #FORWARD PASS
@@ -184,8 +184,8 @@ class BaseTrainer:
                         self.scaler.update()
                         self.total_loss.update(loss.item())
 
-                #except RuntimeError:
-                #    continue
+                except RuntimeError:
+                    continue
 
                     
             else:
