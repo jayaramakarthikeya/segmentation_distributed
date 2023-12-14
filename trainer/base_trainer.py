@@ -21,9 +21,11 @@ from torchvision import transforms
 import torch.distributed as dist
 
 class BaseTrainer:
-    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,available_gpus,start_epoch, parallel_type=None):
+    def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,
+                 available_gpus,start_epoch, parallel_type=None):
         self.logger = logger
         self.train_loader = train_loader
+        
         self.config = config
         self.device = device
         self.n_gpu = n_gpu
@@ -32,7 +34,11 @@ class BaseTrainer:
         trainable_params = filter(lambda p:p.requires_grad, self.model.parameters())
         self.optimizer = getattr(torch.optim, config['optimizer']['type'])(trainable_params, **config['optimizer']['args'])
         self.val_loader = val_loader
-        self.model_type = "PSPnet"#self.model.model_type
+        self.parallel_type = parallel_type
+        if self.parallel_type is not None:
+            self.model_type = self.model.module.model_type
+        else:
+            self.model_type = self.model.model_type
         
         self.parallel_type = parallel_type
         
@@ -67,19 +73,21 @@ class BaseTrainer:
             self.mnt_mode, self.mnt_metric = self.monitor.split()
             assert self.mnt_mode in ['min', 'max']
 
+        if self.device == 0:
         #CHECKPOINTS & TENSOBOARD
-        start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
-        self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.model_type, start_time)
-        helpers.dir_exists(self.checkpoint_dir)
-        config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
-        with open(config_save_path, 'w') as handle:
-            json.dump(self.config, handle, indent=4, sort_keys=True)
+            start_time = datetime.datetime.now().strftime('%m-%d_%H-%M')
+            self.checkpoint_dir = os.path.join(cfg_trainer['save_dir'], self.model_type, start_time)
+            helpers.dir_exists(self.checkpoint_dir)
+            config_save_path = os.path.join(self.checkpoint_dir, 'config.json')
+            with open(config_save_path, 'w') as handle:
+                json.dump(self.config, handle, indent=4, sort_keys=True)
 
-        writer_dir = os.path.join(cfg_trainer['log_dir'], self.model_type, start_time)
-        self.writer = tensorboard.SummaryWriter(writer_dir)
+            writer_dir = os.path.join(cfg_trainer['log_dir'], self.model_type, start_time)
+            self.writer = tensorboard.SummaryWriter(writer_dir)
 
-        #Early Stopping
-        self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,self.checkpoint_dir,self.mnt_mode)
+            #Early Stopping
+            self.early_stoping = EarlyStopping(self.model,self.model_type,self.optimizer,self.config,
+                                            self.checkpoint_dir,self.mnt_mode,patience=int(cfg_trainer['early_stop']),parallel_type=self.parallel_type, device = self.device)
 
         # TRANSORMS FOR VISUALIZATION
         self.restore_transform = transforms.Compose([
@@ -104,27 +112,29 @@ class BaseTrainer:
         self.logger.info(f'Detected GPUs: {sys_gpu} Requested: {n_gpu}')
         available_gpus = list(range(n_gpu))
         return device, available_gpus
-    
 
     def train(self):
-
+        init_start_event = torch.cuda.Event(enable_timing=True)
+        init_end_event = torch.cuda.Event(enable_timing=True)
         #self.model.summary()
         for epoch in range(self.start_epoch,self.epochs):
             results = self._train_epoch(epoch)
-            self.early_stoping(results[self.mnt_metric],epoch,self.model)
-            if epoch % self.config['trainer']['val_per_epochs'] == 0:
-                results = self._valid_epoch(epoch)
+            if self.device == 0:
+                self.early_stoping(results[self.mnt_metric],epoch,self.model)
+                if epoch % self.config['trainer']['val_per_epochs'] == 0:
+                    results = self._valid_epoch(epoch)
 
-            self.logger.info(f"Results for {epoch} epoch: ")
-            for k , v in results.items():
-                self.logger.info(f" {str(k)}: {v}")
-            
+                    self.logger.info(f"Results for {epoch} epoch: ")
+                    for k , v in results.items():
+                        self.logger.info(f" {str(k)}: {v}")
+                
 
-            if self.early_stoping.early_stop:
-                self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
-                self.logger.warning('Training Stopped')
-                break
-
+                if self.early_stoping.early_stop:
+                    self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
+                    self.logger.warning('Training Stopped')
+                    break
+        
+        init_end_event.record()
 
         
 
@@ -138,21 +148,47 @@ class BaseTrainer:
         #print("In train epoch&&&&&")
 
         for batch_idx , (images,labels) in enumerate(tbar):
-            if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+            if self.parallel_type != "ddp":
+                if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                    images , labels = images.to(self.device) , labels.to(self.device)
+            else:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             
+            if self.parallel_type == None:
 
-            #if self.parallel_type == None:
-                #print("Parallel type None)))))))") 
+                #try:
+                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                    
+                        #FORWARD PASS
+                        self.optimizer.zero_grad()
+                        output = self.model(images)
 
-            #try:
-            with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
-                #print("heufheuf@@@@")
-                #FORWARD PASS
+                        #BACKWARD PASS AND OPTIMIZE
+                        if self.model_type[:3] == "PSP":
+                            assert output[0].size()[2:] == labels.size()[1:]
+                            assert output[0].size()[1] == self.num_classes 
+                            loss = self.loss(output[0], labels)
+                            loss += self.loss(output[1], labels) * 0.4
+                            output = output[0]
+                        else:
+                            assert output.size()[2:] == labels.size()[1:]
+                            assert output.size()[1] == self.num_classes 
+                            loss = self.loss(output, labels)
+
+                            
+                        self.scaler.scale(loss).backward()
+                        self.scaler.step(self.optimizer)
+                        self.scaler.update()
+                        self.total_loss.update(loss.item())
+
+                #except RuntimeError:
+                #    continue
+
+                    
+            else:
                 self.optimizer.zero_grad()
                 output = self.model(images)
-                #BACKWARD PASS AND OPTIMIZE
                 if self.model_type[:3] == "PSP":
                     assert output[0].size()[2:] == labels.size()[1:]
                     assert output[0].size()[1] == self.num_classes 
@@ -164,68 +200,46 @@ class BaseTrainer:
                     assert output.size()[1] == self.num_classes 
                     loss = self.loss(output, labels)
 
-                
-                self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.total_loss.update(loss.item())
-
-            #except RuntimeError:
-            #    continue
-
-                    
-            #else:
-            """ self.optimizer.zero_grad()
-            output = self.model(images)
-            #print("************in DP train loop")
-            if self.model.module.model_type[:3] == "PSP":
-                assert output[0].size()[2:] == labels.size()[1:]
-                assert output[0].size()[1] == self.num_classes 
-                loss = self.loss(output[0], labels)
-                loss += self.loss(output[1], labels) * 0.4
-                output = output[0]
-            else:
-                assert output.size()[2:] == labels.size()[1:]
-                assert output.size()[1] == self.num_classes 
-                loss = self.loss(output, labels)
-
-            #print("LOSS BACKWARD#######")
-            loss.backward()
-            self.optimizer.step()
-            self.total_loss.update(loss.item()) """
+                #print("LOSS BACKWARD#######")
+                loss.backward()
+                self.optimizer.step()
+                if self.device == 0:
+                    self.total_loss.update(loss.item())
 
 
             
             # measure elapsed time
             self.batch_time.update(time.time() - tic)
             tic = time.time()
+            if self.device ==0:
+                # LOGGING & TENSORBOARD
+                if batch_idx % self.log_step == 0:
+                    self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
+                    self.writer.add_scalar(f'{self.writer_mode}/loss', loss.item(), self.wrt_step)
 
-            # LOGGING & TENSORBOARD
-            if batch_idx % self.log_step == 0:
-                self.wrt_step = (epoch - 1) * len(self.train_loader) + batch_idx
-                self.writer.add_scalar(f'{self.writer_mode}/loss', loss.item(), self.wrt_step)
-
-            # FOR EVAL
-            seg_metrics = eval_metrics(output, labels, self.num_classes)
-            self._update_seg_metrics(*seg_metrics)
-            pixAcc, mIoU = self._get_seg_metrics().values()
+                # FOR EVAL
+                seg_metrics = eval_metrics(output, labels, self.num_classes)
+                self._update_seg_metrics(*seg_metrics)
+                pixAcc, mIoU = self._get_seg_metrics().values()
 
 
-            # PRINT INFO
-            tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
-                                                epoch, self.total_loss.average, 
-                                                pixAcc, mIoU,
-                                                self.batch_time.average, self.data_time.average))
+                # PRINT INFO
+                tbar.set_description('TRAIN ({}) | Loss: {:.3f} | Acc {:.2f} mIoU {:.2f} | B {:.2f} D {:.2f} |'.format(
+                                                    epoch, self.total_loss.average, 
+                                                    pixAcc, mIoU,
+                                                    self.batch_time.average, self.data_time.average))
 
-        # METRICS TO TENSORBOARD
-        seg_metrics = self._get_seg_metrics()
-        for k, v in list(seg_metrics.items())[:-1]: 
-            self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
-        for i, opt_group in enumerate(self.optimizer.param_groups):
-            self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
+                # METRICS TO TENSORBOARD
+                seg_metrics = self._get_seg_metrics()
+                for k, v in list(seg_metrics.items())[:-1]: 
+                    self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
+                for i, opt_group in enumerate(self.optimizer.param_groups):
+                    self.writer.add_scalar(f'{self.writer_mode}/Learning_rate_{i}', opt_group['lr'], self.wrt_step)
 
+        log = {}
         # RETURN LOSS & METRICS
-        log = {'loss': self.total_loss.average,
+        if self.device == 0:
+            log = {'loss': self.total_loss.average,
                 **seg_metrics}
         
         if self.lr_sheduler is not None:
@@ -271,7 +285,7 @@ class BaseTrainer:
     def _valid_epoch(self, epoch):
         self.logger.info('\n###### EVALUATION ######')
 
-        self.model.module.eval()
+        self.model.eval()
         self.writer_mode = 'val'
 
         self._reset_metrics()
@@ -279,17 +293,25 @@ class BaseTrainer:
         with torch.no_grad():
             val_visual = []
             for batch_idx, (images,labels) in enumerate(tbar):
-                if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                if self.parallel_type != "ddp":
+                    if len(self.available_gpus) >= 1 and self.n_gpu == 1:
+                        images , labels = images.to(self.device) , labels.to(self.device)
+                else:
                     images , labels = images.to(self.device) , labels.to(self.device)
                 # LOSS
-                try:
-                    with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
-                    
-                        output = self.model(images)
-                        loss = self.loss(output, labels)
-                        self.total_loss.update(loss.item())
-                except RuntimeError:
-                    continue
+                if self.parallel_type is not None:
+                    output = self.model(images)
+                    loss = self.loss(output, labels)
+                    self.total_loss.update(loss.item())
+                else:
+                    try:
+                        with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
+                        
+                            output = self.model(images)
+                            loss = self.loss(output, labels)
+                            self.total_loss.update(loss.item())
+                    except RuntimeError:
+                        continue
 
                 seg_metrics = eval_metrics(output, labels, self.num_classes)
                 self._update_seg_metrics(*seg_metrics)
@@ -325,7 +347,7 @@ class BaseTrainer:
             seg_metrics = self._get_seg_metrics()
             for k, v in list(seg_metrics.items())[:-1]: 
                 self.writer.add_scalar(f'{self.writer_mode}/{k}', v, self.wrt_step)
-
+            print(self.total_loss)
             log = {
                 'val_loss': self.total_loss.average,
                 **seg_metrics

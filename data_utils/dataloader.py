@@ -5,6 +5,7 @@ from copy import deepcopy
 import torch
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.distributed import DistributedSampler
 from data_utils.dataset import ADE20KDataset
 import matplotlib.pyplot as plt
 from utils import transforms as local_transforms
@@ -13,7 +14,8 @@ from torchvision import transforms
 
 class ADE20KDataLoader(DataLoader):
     def __init__(self, data_dir, batch_size, split, crop_size=None, base_size=None, scale=True, num_workers=1, val=False,
-                    shuffle=False, flip=False, rotate=False, blur= False, augment=False, val_split= 0.0):
+                    shuffle=False, flip=False, rotate=False, blur= False, augment=False, val_split= 0.0, 
+                    parallel_type = None):
         self.MEAN = [0.48897059, 0.46548275, 0.4294]
         self.STD = [0.22861765, 0.22948039, 0.24054667]
 
@@ -31,20 +33,34 @@ class ADE20KDataLoader(DataLoader):
             'rotate': rotate
         }
 
+        self.parallel_type = parallel_type
         self.dataset = ADE20KDataset(**kwargs)
         self.shuffle = shuffle
         self.nbr_examples = len(self.dataset)
         if val_split: self.train_sampler, self.val_sampler = self._split_sampler(val_split)
         else: self.train_sampler, self.val_sampler = None, None
 
-        self.dataloader_kwargs = {
+        if parallel_type == 'ddp':
+            self.dataloader_kwargs = {
             'dataset': self.dataset,
             'batch_size': batch_size,
-            'shuffle': self.shuffle,
+            'shuffle': False,#self.shuffle,
             'num_workers': num_workers,
-            'pin_memory': True
-        }
-        super(ADE20KDataLoader, self).__init__(sampler=self.train_sampler, **self.dataloader_kwargs)
+            'pin_memory': True, 
+            'sampler' : DistributedSampler(self.dataset)
+            }
+        
+        else:
+
+            self.dataloader_kwargs = {
+                'dataset': self.dataset,
+                'batch_size': batch_size,
+                'shuffle': self.shuffle,
+                'num_workers': num_workers,
+                'pin_memory': True
+            }
+
+        super(ADE20KDataLoader, self).__init__(**self.dataloader_kwargs)
 
     def _split_sampler(self, split):
         if split == 0.0:

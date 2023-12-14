@@ -38,7 +38,7 @@
         "tensorboard_log_step": 1,
   
         "monitor": "max Mean_IoU",
-        "early_stop": 5,
+        "early_stop": 3,
         
         "tensorboard": true,
         "log_dir": "saved/runs",
