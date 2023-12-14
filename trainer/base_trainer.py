@@ -132,6 +132,8 @@ class BaseTrainer:
                 if self.early_stoping.early_stop:
                     self.logger.info(f'\nPerformance didn\'t improve for {self.early_stoping.counter} epochs')
                     self.logger.warning('Training Stopped')
+                    if self.parallel_type is not None and self.parallel_type == "ddp":
+                        cleanup()
                     break
         
         init_end_event.record()
