@@ -32,7 +32,8 @@ def get_extensions():
             "-DCUDA_HAS_FP16=1",
             "-D__CUDA_NO_HALF_OPERATORS__",
             "-D__CUDA_NO_HALF_CONVERSIONS__",
-            "-D__CUDA_NO_HALF2_OPERATORS__",
+            "-D__CUDA_NO_HALF2_OPERATORS__"
+
         ]
 
         ext_modules = [
