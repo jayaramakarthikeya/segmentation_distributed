@@ -9,7 +9,8 @@ class SingleGPUTrainer(BaseTrainer):
         self.train_loader = train_loader
         self.n_gpu = self.config['n_gpu']
 
-        self.device , self.available_gpus = self._get_available_devices(self.n_gpu)
+        _ , self.available_gpus = self._get_available_devices(self.n_gpu)
+        self.device = 0
         model_ = model
         if len(self.available_gpus) >= 1:
             model_ = model.to(self.device)

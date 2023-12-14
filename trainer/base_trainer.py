@@ -37,6 +37,8 @@ class BaseTrainer:
         self.parallel_type = parallel_type
         if self.parallel_type is not None:
             self.model_type = self.model.module.model_type
+        else:
+            self.model_type = self.model.model_type
         
         self.parallel_type = parallel_type
         
@@ -153,10 +155,9 @@ class BaseTrainer:
                 images , labels = images.to(self.device) , labels.to(self.device)
             self.data_time.update(time.time() - tic)
             
-
             if self.parallel_type == None:
 
-                try:
+                #try:
                     with torch.autocast(device_type='cuda', dtype=torch.float16,enabled=True):
 
                         #FORWARD PASS
@@ -181,8 +182,8 @@ class BaseTrainer:
                         self.scaler.update()
                         self.total_loss.update(loss.item())
 
-                except RuntimeError:
-                    continue
+                #except RuntimeError:
+                #    continue
 
                     
             else:
