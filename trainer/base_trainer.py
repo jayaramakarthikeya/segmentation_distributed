@@ -19,6 +19,7 @@ from utils.metrics import eval_metrics, AverageMeter
 from torchvision.utils import make_grid
 from torchvision import transforms
 import torch.distributed as dist
+from utils.helpers import cleanup
 
 class BaseTrainer:
     def __init__(self,config,model,train_loader,val_loader,logger,device,n_gpu,
